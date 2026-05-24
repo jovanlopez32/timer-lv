@@ -6,11 +6,14 @@ import {
     Copy,
     CopyCheck,
     Pause,
+    PictureInPicture2,
     Play,
     Square,
+    X,
 } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
+import { usePictureInPictureWindow } from '@/composables/usePictureInPictureWindow';
 import {
     Command,
     CommandEmpty,
@@ -308,6 +311,38 @@ const onPrimaryClick = () => {
 };
 
 const hasActiveTimer = computed(() => !!props.activeTimer);
+
+const {
+    isSupported: pipSupported,
+    isOpen: pipOpen,
+    pipBody,
+    open: openPip,
+    close: closePip,
+} = usePictureInPictureWindow();
+
+const togglePip = () => {
+    if (pipOpen.value) {
+        closePip();
+    } else {
+        openPip();
+    }
+};
+
+// Pull the user back to the main page when the completion modal appears
+// so they actually see the summary instead of it opening behind the PiP.
+// window.focus() raises the opener tab even if the browser is backgrounded.
+watch(completedModalOpen, (open) => {
+    if (open && pipOpen.value) {
+        closePip();
+        window.focus();
+    }
+});
+
+const timerSectionClass = computed(() =>
+    pipOpen.value
+        ? 'flex min-h-screen flex-col justify-center gap-6 bg-background p-6'
+        : 'space-y-6 rounded-2xl border bg-card p-8 text-card-foreground shadow-sm',
+);
 </script>
 
 <template>
@@ -383,71 +418,105 @@ const hasActiveTimer = computed(() => !!props.activeTimer);
                 </Popover>
             </section>
 
-            <Transition
-                enter-active-class="transition-opacity duration-500"
-                enter-from-class="opacity-0"
-                enter-to-class="opacity-100"
-                leave-active-class="duration-0"
-                :appear="!hasShownTimer"
+            <div
+                v-if="showTimer && pipOpen"
+                class="space-y-3 rounded-2xl border border-dashed bg-card/50 p-6 text-center text-card-foreground"
             >
-                <section
-                    v-if="showTimer"
-                    class="space-y-6 rounded-2xl border bg-card p-8 text-card-foreground shadow-sm"
+                <p class="text-sm text-muted-foreground">
+                    Timer running in floating window.
+                </p>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    @click="closePip"
                 >
-                    <div class="text-center">
-                        <p
-                            class="font-mono text-6xl font-light tracking-widest tabular-nums"
-                        >
-                            {{ formattedElapsed }}
-                        </p>
-                        <p
-                            class="mt-2 text-xs uppercase tracking-wider text-muted-foreground"
-                        >
-                            {{
-                                hasActiveTimer
-                                    ? isRunning
-                                        ? 'Running'
-                                        : 'Paused'
-                                    : 'Ready to start'
-                            }}
-                        </p>
-                    </div>
+                    Bring back
+                </Button>
+            </div>
 
-                    <div class="flex items-center justify-center gap-3">
-                        <Button
-                            type="button"
-                            size="lg"
-                            :disabled="
-                                processing ||
-                                (!hasActiveTimer && !selectedTaskTypeId)
-                            "
-                            class="h-14 w-14 rounded-full p-0"
-                            @click="onPrimaryClick"
-                        >
-                            <Play
-                                v-if="!isRunning"
-                                class="h-6 w-6 fill-current"
-                            />
-                            <Pause v-else class="h-6 w-6 fill-current" />
-                            <span class="sr-only">
-                                {{ isRunning ? 'Pause' : 'Play' }}
-                            </span>
-                        </Button>
+            <Teleport :to="pipBody" :disabled="!pipBody">
+                <Transition
+                    enter-active-class="transition-opacity duration-500"
+                    enter-from-class="opacity-0"
+                    enter-to-class="opacity-100"
+                    leave-active-class="duration-0"
+                    :appear="!hasShownTimer"
+                >
+                    <section v-if="showTimer" :class="timerSectionClass">
+                        <div class="relative">
+                            <Button
+                                v-if="pipSupported"
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                class="absolute right-0 top-0 h-8 w-8 text-muted-foreground"
+                                @click="togglePip"
+                            >
+                                <X v-if="pipOpen" class="h-4 w-4" />
+                                <PictureInPicture2 v-else class="h-4 w-4" />
+                                <span class="sr-only">
+                                    {{
+                                        pipOpen
+                                            ? 'Close floating window'
+                                            : 'Open in floating window'
+                                    }}
+                                </span>
+                            </Button>
+                            <p
+                                class="text-center font-mono text-6xl font-light tracking-widest tabular-nums"
+                            >
+                                {{ formattedElapsed }}
+                            </p>
+                            <p
+                                class="mt-2 text-center text-xs uppercase tracking-wider text-muted-foreground"
+                            >
+                                {{
+                                    hasActiveTimer
+                                        ? isRunning
+                                            ? 'Running'
+                                            : 'Paused'
+                                        : 'Ready to start'
+                                }}
+                            </p>
+                        </div>
 
-                        <Button
-                            v-if="hasActiveTimer"
-                            type="button"
-                            variant="secondary"
-                            size="lg"
-                            :disabled="processing"
-                            @click="complete"
-                        >
-                            <Square class="mr-2 h-4 w-4 fill-current" />
-                            Mark as completed
-                        </Button>
-                    </div>
-                </section>
-            </Transition>
+                        <div class="flex items-center justify-center gap-3">
+                            <Button
+                                type="button"
+                                size="lg"
+                                :disabled="
+                                    processing ||
+                                    (!hasActiveTimer && !selectedTaskTypeId)
+                                "
+                                class="h-14 w-14 rounded-full p-0"
+                                @click="onPrimaryClick"
+                            >
+                                <Play
+                                    v-if="!isRunning"
+                                    class="h-6 w-6 fill-current"
+                                />
+                                <Pause v-else class="h-6 w-6 fill-current" />
+                                <span class="sr-only">
+                                    {{ isRunning ? 'Pause' : 'Play' }}
+                                </span>
+                            </Button>
+
+                            <Button
+                                v-if="hasActiveTimer"
+                                type="button"
+                                variant="secondary"
+                                size="lg"
+                                :disabled="processing"
+                                @click="complete"
+                            >
+                                <Square class="mr-2 h-4 w-4 fill-current" />
+                                Mark as completed
+                            </Button>
+                        </div>
+                    </section>
+                </Transition>
+            </Teleport>
 
         </div>
 

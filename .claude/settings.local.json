@@ -36,7 +36,8 @@
       "PowerShell(php artisan test --compact tests/Feature/Admin tests/Feature/PublicTimerTest.php tests/Feature/DashboardTest.php)",
       "PowerShell(php artisan test --compact)",
       "PowerShell(vendor/bin/pint --dirty --format agent)",
-      "PowerShell(php artisan test --compact tests/Feature/PublicTimerTest.php)"
+      "PowerShell(php artisan test --compact tests/Feature/PublicTimerTest.php)",
+      "Bash(npm run *)"
     ]
   },
   "enableAllProjectMcpServers": true,
