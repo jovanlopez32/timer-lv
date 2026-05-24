@@ -6,6 +6,8 @@ import {
     FolderGit2,
     LayoutGrid,
     ListChecks,
+    PieChart,
+    Tag,
     Users,
 } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
@@ -35,9 +37,19 @@ const platformItems: NavItem[] = [
         href: '/admin/reports',
         icon: BarChart3,
     },
+    {
+        title: 'Stats',
+        href: '/admin/stats',
+        icon: PieChart,
+    },
 ];
 
 const settingsItems: NavItem[] = [
+    {
+        title: 'Brands',
+        href: '/admin/brands',
+        icon: Tag,
+    },
     {
         title: 'Agents',
         href: '/admin/agents',

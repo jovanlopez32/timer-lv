@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\Admin\AgentController;
+use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ReportsController;
+use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\TaskTypeController;
 use App\Http\Controllers\PublicTimerController;
 use Illuminate\Support\Facades\Route;
@@ -16,6 +18,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('admin')->group(function () {
         Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
+        Route::get('stats', [StatsController::class, 'index'])->name('stats.index');
+
+        Route::get('brands', [BrandController::class, 'index'])->name('brands.index');
+        Route::post('brands', [BrandController::class, 'store'])->name('brands.store');
+        Route::patch('brands/{brand:id}', [BrandController::class, 'update'])->name('brands.update');
+        Route::delete('brands/{brand:id}', [BrandController::class, 'destroy'])->name('brands.destroy');
 
         Route::get('agents', [AgentController::class, 'index'])->name('agents.index');
         Route::post('agents', [AgentController::class, 'store'])->name('agents.store');

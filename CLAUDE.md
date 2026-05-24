@@ -1,3 +1,22 @@
+<instructions>
+# Core Guidelines: Laravel 13 + Inertia.js + Vue 3 + Tailwind CSS + shadcn-vue
+
+## UI & Component Architecture (shadcn-vue & Tailwind)
+- Always utilize the shadcn-vue MCP server to discover, integrate, and verify the correct UI components. Do not hallucinate component props or structures.
+- Design a modern, clean, and minimalist user interface.
+- Avoid overusing the `<Card>` component; explore alternative layout structures (like standard grids, flex layouts, or clean typography) to maintain a lightweight design.
+- Strictly rely on Tailwind CSS utility-first classes for styling. Avoid writing custom CSS.
+
+## Data Fetching & Routing (Inertia.js)
+- NEVER use Axios or the native `fetch` API for data retrieval or form submissions.
+- Exclusively use Inertia.js features (`useForm`, `<Link>`, `router.visit()`, `router.get()`, etc.) to handle all server requests, state management, and navigation.
+
+## Code Quality & Simplicity
+- Prioritize extreme simplicity and readability in your code. Avoid over-engineering or creating unnecessary abstractions.
+- Use the Vue 3 Composition API (`<script setup>`) and ensure all components have a single root element.
+- Keep components small and focused on a single responsibility.
+</instructions>
+
 <laravel-boost-guidelines>
 === foundation rules ===
 

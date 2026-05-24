@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Models\Brand;
 use App\Models\TaskType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,29 +27,61 @@ class TaskTypesTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('admin/TaskTypes')
-                ->has('taskTypes', 3),
+                ->has('taskTypes', 3)
+                ->has('brands'),
             );
     }
 
     public function test_admin_can_create_a_task_type(): void
     {
         $user = User::factory()->create();
+        $brand = Brand::factory()->create();
 
         $this->actingAs($user)
-            ->post('/admin/task-types', ['name' => 'Development'])
+            ->post('/admin/task-types', [
+                'name' => 'Development',
+                'brand_id' => $brand->id,
+            ])
             ->assertRedirect('/admin/task-types');
 
-        $this->assertDatabaseHas('task_types', ['name' => 'Development']);
+        $this->assertDatabaseHas('task_types', [
+            'name' => 'Development',
+            'brand_id' => $brand->id,
+        ]);
     }
 
-    public function test_task_type_name_must_be_unique(): void
+    public function test_task_type_name_is_unique_per_brand(): void
     {
         $user = User::factory()->create();
-        TaskType::factory()->create(['name' => 'QA']);
+        $brand = Brand::factory()->create();
+        TaskType::factory()->create(['name' => 'QA', 'brand_id' => $brand->id]);
 
         $this->actingAs($user)
-            ->post('/admin/task-types', ['name' => 'QA'])
+            ->post('/admin/task-types', [
+                'name' => 'QA',
+                'brand_id' => $brand->id,
+            ])
             ->assertSessionHasErrors('name');
+    }
+
+    public function test_task_type_name_can_repeat_across_brands(): void
+    {
+        $user = User::factory()->create();
+        $brandA = Brand::factory()->create();
+        $brandB = Brand::factory()->create();
+        TaskType::factory()->create(['name' => 'QA', 'brand_id' => $brandA->id]);
+
+        $this->actingAs($user)
+            ->post('/admin/task-types', [
+                'name' => 'QA',
+                'brand_id' => $brandB->id,
+            ])
+            ->assertRedirect('/admin/task-types');
+
+        $this->assertDatabaseHas('task_types', [
+            'name' => 'QA',
+            'brand_id' => $brandB->id,
+        ]);
     }
 
     public function test_admin_can_delete_a_task_type(): void

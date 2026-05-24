@@ -13,6 +13,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import {
     Table,
@@ -25,15 +32,18 @@ import {
 } from '@/components/ui/table';
 import { dashboard } from '@/routes';
 
+type Brand = { id: number; name: string };
+
 type Agent = {
     id: number;
     name: string;
     slug: string;
-    brand: string;
+    brand_id: number;
+    brand: string | null;
     created_at: string;
 };
 
-defineProps<{ agents: Agent[] }>();
+const props = defineProps<{ agents: Agent[]; brands: Brand[] }>();
 
 defineOptions({
     layout: {
@@ -47,6 +57,11 @@ defineOptions({
 
 const justCopied = ref<number | null>(null);
 const editing = ref<Agent | null>(null);
+
+const newBrandId = ref<string | undefined>(
+    props.brands.length > 0 ? String(props.brands[0].id) : undefined,
+);
+const editBrandId = ref<string | undefined>(undefined);
 
 const publicUrl = (slug: string) => `${window.location.origin}/${slug}`;
 
@@ -69,6 +84,7 @@ const destroy = (agent: Agent) => {
 
 const openEdit = (agent: Agent) => {
     editing.value = { ...agent };
+    editBrandId.value = String(agent.brand_id);
 };
 </script>
 
@@ -79,11 +95,24 @@ const openEdit = (agent: Agent) => {
         <header>
             <h1 class="text-2xl font-semibold">Agents</h1>
             <p class="text-sm text-muted-foreground">
-                Create an agent and share their public timer link.
+                Create an agent, pick a brand, and share their public timer
+                link.
             </p>
         </header>
 
         <section
+            v-if="brands.length === 0"
+            class="rounded-xl border border-dashed bg-card p-6 text-sm text-muted-foreground"
+        >
+            You need to
+            <Link href="/admin/brands" class="font-medium text-primary hover:underline">
+                create a brand
+            </Link>
+            before adding agents.
+        </section>
+
+        <section
+            v-else
             class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm"
         >
             <h2 class="mb-4 text-lg font-semibold">New agent</h2>
@@ -100,14 +129,22 @@ const openEdit = (agent: Agent) => {
                     <InputError :message="errors.name" />
                 </div>
                 <div class="grid gap-2">
-                    <Label for="brand">Brand</Label>
-                    <Input
-                        id="brand"
-                        name="brand"
-                        required
-                        autocomplete="off"
-                    />
-                    <InputError :message="errors.brand" />
+                    <Label for="brand_id">Brand</Label>
+                    <Select v-model="newBrandId" name="brand_id" required>
+                        <SelectTrigger id="brand_id">
+                            <SelectValue placeholder="Select a brand" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem
+                                v-for="brand in brands"
+                                :key="brand.id"
+                                :value="String(brand.id)"
+                            >
+                                {{ brand.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <InputError :message="errors.brand_id" />
                 </div>
                 <Button type="submit" :disabled="processing">
                     <Spinner v-if="processing" />
@@ -134,7 +171,7 @@ const openEdit = (agent: Agent) => {
                         <TableCell class="font-medium">
                             {{ agent.name }}
                         </TableCell>
-                        <TableCell>{{ agent.brand }}</TableCell>
+                        <TableCell>{{ agent.brand ?? '—' }}</TableCell>
                         <TableCell>
                             <Link
                                 :href="`/${agent.slug}`"
@@ -207,14 +244,22 @@ const openEdit = (agent: Agent) => {
                         <InputError :message="errors.name" />
                     </div>
                     <div class="grid gap-2">
-                        <Label for="edit-brand">Brand</Label>
-                        <Input
-                            id="edit-brand"
-                            name="brand"
-                            :default-value="editing.brand"
-                            required
-                        />
-                        <InputError :message="errors.brand" />
+                        <Label for="edit-brand_id">Brand</Label>
+                        <Select v-model="editBrandId" name="brand_id" required>
+                            <SelectTrigger id="edit-brand_id">
+                                <SelectValue placeholder="Select a brand" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="brand in brands"
+                                    :key="brand.id"
+                                    :value="String(brand.id)"
+                                >
+                                    {{ brand.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError :message="errors.brand_id" />
                     </div>
                     <DialogFooter>
                         <Button

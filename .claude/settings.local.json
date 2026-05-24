@@ -29,7 +29,14 @@
       "PowerShell(php artisan test --compact 2>&1 | Select-Object -Last 10)",
       "PowerShell(php artisan wayfinder:generate --no-interaction 2>&1 | Select-Object -Last 5)",
       "PowerShell(php artisan test --compact 2>&1 | Select-Object -Last 5)",
-      "PowerShell(vendor/bin/pint --dirty --format agent 2>&1 | Select-Object -Last 3; php artisan test --compact tests/Feature/PublicTimerTest.php 2>&1 | Select-Object -Last 3)"
+      "PowerShell(vendor/bin/pint --dirty --format agent 2>&1 | Select-Object -Last 3; php artisan test --compact tests/Feature/PublicTimerTest.php 2>&1 | Select-Object -Last 3)",
+      "PowerShell(php artisan make:model Brand -mf --no-interaction)",
+      "PowerShell(php artisan make:controller Admin/BrandController --no-interaction)",
+      "PowerShell(php artisan make:controller Admin/StatsController --no-interaction)",
+      "PowerShell(php artisan test --compact tests/Feature/Admin tests/Feature/PublicTimerTest.php tests/Feature/DashboardTest.php)",
+      "PowerShell(php artisan test --compact)",
+      "PowerShell(vendor/bin/pint --dirty --format agent)",
+      "PowerShell(php artisan test --compact tests/Feature/PublicTimerTest.php)"
     ]
   },
   "enableAllProjectMcpServers": true,

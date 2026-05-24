@@ -7,6 +7,7 @@ use App\Models\TaskType;
 use App\Models\Timer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -15,6 +16,8 @@ class PublicTimerController extends Controller
 {
     public function show(Agent $agent): Response
     {
+        $agent->load('brand:id,name');
+
         $activeTimer = Timer::query()
             ->where('agent_id', $agent->id)
             ->active()
@@ -24,8 +27,6 @@ class PublicTimerController extends Controller
         $payload = null;
 
         if ($activeTimer) {
-            $current = $activeTimer->currentSession();
-
             $payload = [
                 'id' => $activeTimer->id,
                 'task_type_id' => $activeTimer->task_type_id,
@@ -35,8 +36,7 @@ class PublicTimerController extends Controller
                 ],
                 'started_at' => $activeTimer->started_at->toIso8601String(),
                 'elapsed_seconds' => $activeTimer->elapsedSeconds(),
-                'is_running' => (bool) $current,
-                'current_session_started_at' => $current?->started_at->toIso8601String(),
+                'is_running' => $activeTimer->currentSession() !== null,
             ];
         }
 
@@ -45,9 +45,10 @@ class PublicTimerController extends Controller
                 'id' => $agent->id,
                 'name' => $agent->name,
                 'slug' => $agent->slug,
-                'brand' => $agent->brand,
+                'brand' => $agent->brand?->name,
             ],
             'taskTypes' => TaskType::query()
+                ->where('brand_id', $agent->brand_id)
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'activeTimer' => $payload,
@@ -57,7 +58,12 @@ class PublicTimerController extends Controller
     public function start(Request $request, Agent $agent): RedirectResponse
     {
         $data = $request->validate([
-            'task_type_id' => ['required', 'integer', 'exists:task_types,id'],
+            'task_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('task_types', 'id')
+                    ->where(fn ($q) => $q->where('brand_id', $agent->brand_id)),
+            ],
         ]);
 
         if (Timer::where('agent_id', $agent->id)->active()->exists()) {

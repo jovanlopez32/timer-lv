@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Agent;
+use App\Models\Brand;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -12,8 +13,6 @@ use Illuminate\Support\Str;
 class AgentFactory extends Factory
 {
     /**
-     * Define the model's default state.
-     *
      * @return array<string, mixed>
      */
     public function definition(): array
@@ -23,7 +22,7 @@ class AgentFactory extends Factory
         return [
             'name' => $name,
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(4)),
-            'brand' => fake()->company(),
+            'brand_id' => Brand::factory(),
         ];
     }
 }

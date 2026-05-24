@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Models\Agent;
+use App\Models\Brand;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -27,39 +28,51 @@ class AgentsTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('admin/Agents')
-                ->has('agents', 2),
+                ->has('agents', 2)
+                ->has('brands'),
             );
     }
 
     public function test_admin_can_create_an_agent_with_auto_slug(): void
     {
         $user = User::factory()->create();
+        $brand = Brand::factory()->create();
 
         $this->actingAs($user)
             ->post('/admin/agents', [
                 'name' => 'Luis Hurtado',
-                'brand' => 'Leadventure',
+                'brand_id' => $brand->id,
             ])
             ->assertRedirect('/admin/agents');
 
         $this->assertDatabaseHas('agents', [
             'name' => 'Luis Hurtado',
             'slug' => 'luis-hurtado',
-            'brand' => 'Leadventure',
+            'brand_id' => $brand->id,
         ]);
     }
 
     public function test_slug_is_unique_when_name_collides(): void
     {
         $user = User::factory()->create();
+        $brand = Brand::factory()->create();
         Agent::factory()->create(['slug' => 'luis-hurtado']);
 
         $this->actingAs($user)->post('/admin/agents', [
             'name' => 'Luis Hurtado',
-            'brand' => 'Other Brand',
+            'brand_id' => $brand->id,
         ]);
 
         $this->assertDatabaseHas('agents', ['slug' => 'luis-hurtado-2']);
+    }
+
+    public function test_brand_id_is_required(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post('/admin/agents', ['name' => 'No Brand'])
+            ->assertSessionHasErrors('brand_id');
     }
 
     public function test_admin_can_delete_an_agent(): void

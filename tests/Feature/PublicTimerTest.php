@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Agent;
+use App\Models\Brand;
 use App\Models\TaskType;
 use App\Models\Timer;
 use Carbon\Carbon;
@@ -18,10 +19,15 @@ class PublicTimerTest extends TestCase
         $this->get('/')->assertOk();
     }
 
-    public function test_it_shows_the_agent_timer_page_with_task_types(): void
+    public function test_it_shows_the_agent_timer_page_with_task_types_of_its_brand(): void
     {
-        $agent = Agent::factory()->create(['slug' => 'luis-hurtado']);
-        TaskType::factory()->count(3)->create();
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create([
+            'slug' => 'luis-hurtado',
+            'brand_id' => $brand->id,
+        ]);
+        TaskType::factory()->count(3)->create(['brand_id' => $brand->id]);
+        TaskType::factory()->count(2)->create();
 
         $this->get('/luis-hurtado')
             ->assertOk()
@@ -38,8 +44,12 @@ class PublicTimerTest extends TestCase
     {
         Carbon::setTestNow('2026-05-23 08:00:00');
 
-        $agent = Agent::factory()->create(['slug' => 'luis-hurtado']);
-        $taskType = TaskType::factory()->create();
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create([
+            'slug' => 'luis-hurtado',
+            'brand_id' => $brand->id,
+        ]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", [
             'task_type_id' => $taskType->id,
@@ -55,12 +65,27 @@ class PublicTimerTest extends TestCase
         $this->assertNull($timer->sessions->first()->ended_at);
     }
 
+    public function test_it_rejects_a_task_type_from_another_brand(): void
+    {
+        $brand = Brand::factory()->create();
+        $otherBrand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $foreignTaskType = TaskType::factory()->create(['brand_id' => $otherBrand->id]);
+
+        $this->post("/{$agent->slug}/timers", [
+            'task_type_id' => $foreignTaskType->id,
+        ])->assertSessionHasErrors('task_type_id');
+
+        $this->assertDatabaseCount('timers', 0);
+    }
+
     public function test_it_pauses_a_running_session(): void
     {
         Carbon::setTestNow('2026-05-23 08:00:00');
 
-        $agent = Agent::factory()->create();
-        $taskType = TaskType::factory()->create();
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
 
@@ -79,8 +104,9 @@ class PublicTimerTest extends TestCase
     {
         Carbon::setTestNow('2026-05-23 08:00:00');
 
-        $agent = Agent::factory()->create();
-        $taskType = TaskType::factory()->create();
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
 
@@ -100,8 +126,9 @@ class PublicTimerTest extends TestCase
     {
         Carbon::setTestNow('2026-05-23 08:00:00');
 
-        $agent = Agent::factory()->create();
-        $taskType = TaskType::factory()->create();
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
 
         Carbon::setTestNow('2026-05-23 10:00:00');
@@ -125,8 +152,9 @@ class PublicTimerTest extends TestCase
     {
         Carbon::setTestNow('2026-05-23 08:00:00');
 
-        $agent = Agent::factory()->create();
-        $taskType = TaskType::factory()->create();
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
 
         Carbon::setTestNow('2026-05-23 11:30:00');
@@ -137,10 +165,61 @@ class PublicTimerTest extends TestCase
         $this->assertEquals(3.5, (float) $timer->decimal_hours);
     }
 
+    public function test_show_returns_a_correct_elapsed_seconds_snapshot_for_running_timer(): void
+    {
+        Carbon::setTestNow('2026-05-23 10:00:00');
+
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create([
+            'slug' => 'snapshot-agent',
+            'brand_id' => $brand->id,
+        ]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
+
+        Carbon::setTestNow('2026-05-23 10:05:00');
+
+        $this->get('/snapshot-agent')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('activeTimer.is_running', true)
+                ->where('activeTimer.elapsed_seconds', 300),
+            );
+    }
+
+    public function test_show_returns_paused_elapsed_seconds_without_advancing(): void
+    {
+        Carbon::setTestNow('2026-05-23 10:00:00');
+
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create([
+            'slug' => 'paused-agent',
+            'brand_id' => $brand->id,
+        ]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
+
+        Carbon::setTestNow('2026-05-23 10:05:00');
+        $timer = Timer::first();
+        $this->post("/timers/{$timer->id}/pause");
+
+        Carbon::setTestNow('2026-05-23 11:00:00');
+
+        $this->get('/paused-agent')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('activeTimer.is_running', false)
+                ->where('activeTimer.elapsed_seconds', 300),
+            );
+    }
+
     public function test_it_prevents_starting_a_second_timer_for_the_same_agent(): void
     {
-        $agent = Agent::factory()->create();
-        $taskType = TaskType::factory()->create();
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id])
             ->assertRedirect();

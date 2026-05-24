@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Agent;
+use App\Models\Brand;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -16,8 +17,20 @@ class AgentController extends Controller
     {
         return Inertia::render('admin/Agents', [
             'agents' => Agent::query()
+                ->with('brand:id,name')
                 ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'brand', 'created_at']),
+                ->get(['id', 'name', 'slug', 'brand_id', 'created_at'])
+                ->map(fn (Agent $agent) => [
+                    'id' => $agent->id,
+                    'name' => $agent->name,
+                    'slug' => $agent->slug,
+                    'brand_id' => $agent->brand_id,
+                    'brand' => $agent->brand?->name,
+                    'created_at' => $agent->created_at?->toIso8601String(),
+                ]),
+            'brands' => Brand::query()
+                ->orderBy('name')
+                ->get(['id', 'name']),
         ]);
     }
 
@@ -25,15 +38,13 @@ class AgentController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'brand' => ['required', 'string', 'max:255'],
+            'brand_id' => ['required', 'integer', 'exists:brands,id'],
         ]);
-
-        $slug = $this->uniqueSlug($data['name']);
 
         Agent::create([
             'name' => $data['name'],
-            'brand' => $data['brand'],
-            'slug' => $slug,
+            'brand_id' => $data['brand_id'],
+            'slug' => $this->uniqueSlug($data['name']),
         ]);
 
         return redirect()->route('agents.index');
@@ -43,7 +54,7 @@ class AgentController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'brand' => ['required', 'string', 'max:255'],
+            'brand_id' => ['required', 'integer', 'exists:brands,id'],
         ]);
 
         $slug = $agent->slug;
@@ -53,7 +64,7 @@ class AgentController extends Controller
 
         $agent->update([
             'name' => $data['name'],
-            'brand' => $data['brand'],
+            'brand_id' => $data['brand_id'],
             'slug' => $slug,
         ]);
 

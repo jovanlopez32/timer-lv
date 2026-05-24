@@ -50,7 +50,6 @@ type ActiveTimer = {
     started_at: string;
     elapsed_seconds: number;
     is_running: boolean;
-    current_session_started_at: string | null;
 };
 
 const props = defineProps<{
@@ -148,14 +147,21 @@ const showTimer = computed(
 
 const elapsedSeconds = ref(props.activeTimer?.elapsed_seconds ?? 0);
 const isRunning = ref(props.activeTimer?.is_running ?? false);
-const tickStartedAt = ref<number | null>(
-    props.activeTimer?.is_running && props.activeTimer.current_session_started_at
-        ? new Date(props.activeTimer.current_session_started_at).getTime()
-        : null,
-);
-const baseSeconds = ref(props.activeTimer?.elapsed_seconds ?? 0);
+
+// elapsed_seconds is a server-computed snapshot. snapshotAt records the client
+// time when we received it, so the tick can extrapolate using only client clock
+// deltas and stay correct across tab close/reopen and clock skew.
+const elapsedSnapshot = ref(props.activeTimer?.elapsed_seconds ?? 0);
+const snapshotAt = ref(Date.now());
 
 let intervalId: number | null = null;
+
+const recomputeElapsed = () => {
+    elapsedSeconds.value = isRunning.value
+        ? elapsedSnapshot.value +
+          Math.floor((Date.now() - snapshotAt.value) / 1000)
+        : elapsedSnapshot.value;
+};
 
 const stopTicking = () => {
     if (intervalId !== null) {
@@ -166,25 +172,22 @@ const stopTicking = () => {
 
 const startTicking = () => {
     stopTicking();
-    intervalId = window.setInterval(() => {
-        if (tickStartedAt.value === null) {
-            return;
-        }
-        const delta = Math.floor((Date.now() - tickStartedAt.value) / 1000);
-        elapsedSeconds.value = baseSeconds.value + delta;
-    }, 250);
+    intervalId = window.setInterval(recomputeElapsed, 250);
+};
+
+const onVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+        recomputeElapsed();
+    }
 };
 
 watch(
     () => props.activeTimer,
     (timer) => {
-        baseSeconds.value = timer?.elapsed_seconds ?? 0;
-        elapsedSeconds.value = baseSeconds.value;
+        elapsedSnapshot.value = timer?.elapsed_seconds ?? 0;
+        snapshotAt.value = Date.now();
         isRunning.value = timer?.is_running ?? false;
-        tickStartedAt.value =
-            timer?.is_running && timer.current_session_started_at
-                ? new Date(timer.current_session_started_at).getTime()
-                : null;
+        recomputeElapsed();
         if (isRunning.value) {
             startTicking();
         } else {
@@ -194,8 +197,15 @@ watch(
     { immediate: true },
 );
 
+if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisibilityChange);
+}
+
 onBeforeUnmount(() => {
     stopTicking();
+    if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+    }
 });
 
 const formattedElapsed = computed(() => {
