@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-vue-next';
+import {
+    BarChart3,
+    BookOpen,
+    FolderGit2,
+    LayoutGrid,
+    ListChecks,
+    Users,
+} from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -17,11 +24,29 @@ import {
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
+const platformItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Reports',
+        href: '/admin/reports',
+        icon: BarChart3,
+    },
+];
+
+const settingsItems: NavItem[] = [
+    {
+        title: 'Agents',
+        href: '/admin/agents',
+        icon: Users,
+    },
+    {
+        title: 'Task types',
+        href: '/admin/task-types',
+        icon: ListChecks,
     },
 ];
 
@@ -54,7 +79,8 @@ const footerNavItems: NavItem[] = [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain label="Platform" :items="platformItems" />
+            <NavMain label="Settings" :items="settingsItems" />
         </SidebarContent>
 
         <SidebarFooter>

@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\Agent;
+use App\Models\TaskType;
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,11 +15,27 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        User::updateOrCreate(
+            ['email' => 'jorge.linan@leadventure.com'],
+            [
+                'name' => 'Jorge Linan',
+                'password' => Hash::make('Password'),
+                'email_verified_at' => now(),
+            ],
+        );
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        $agents = [
+            ['name' => 'Luis Hurtado', 'slug' => 'luis-hurtado', 'brand' => 'Leadventure'],
+        ];
+
+        foreach ($agents as $agent) {
+            Agent::updateOrCreate(['slug' => $agent['slug']], $agent);
+        }
+
+        $taskTypes = ['Design', 'Development', 'QA', 'Meeting', 'Research'];
+
+        foreach ($taskTypes as $name) {
+            TaskType::updateOrCreate(['name' => $name], ['name' => $name]);
+        }
     }
 }
