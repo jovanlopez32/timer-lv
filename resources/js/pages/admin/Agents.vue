@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Form, Head, Link, router } from '@inertiajs/vue3';
-import { Copy, Pencil, Trash2 } from 'lucide-vue-next';
+import { Copy, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next';
 import { ref } from 'vue';
 import InputError from '@/components/InputError.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -57,6 +58,7 @@ defineOptions({
 
 const justCopied = ref<number | null>(null);
 const editing = ref<Agent | null>(null);
+const deleting = ref<Agent | null>(null);
 
 const newBrandId = ref<string | undefined>(
     props.brands.length > 0 ? String(props.brands[0].id) : undefined,
@@ -76,9 +78,16 @@ const copyLink = async (agent: Agent) => {
 };
 
 const destroy = (agent: Agent) => {
-    if (!window.confirm(`Delete agent "${agent.name}"?`)) {
+    deleting.value = agent;
+};
+
+const confirmDestroy = () => {
+    if (!deleting.value) {
         return;
     }
+
+    const agent = deleting.value;
+    deleting.value = null;
     router.delete(`/admin/agents/${agent.id}`, { preserveScroll: true });
 };
 
@@ -102,20 +111,20 @@ const openEdit = (agent: Agent) => {
 
         <section
             v-if="brands.length === 0"
-            class="rounded-xl border border-dashed bg-card p-6 text-sm text-muted-foreground"
+            class="rounded-lg border border-dashed p-6 text-sm text-muted-foreground"
         >
             You need to
-            <Link href="/admin/brands" class="font-medium text-primary hover:underline">
+            <Link
+                href="/admin/brands"
+                class="font-medium text-primary hover:underline"
+            >
                 create a brand
             </Link>
             before adding agents.
         </section>
 
-        <section
-            v-else
-            class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm"
-        >
-            <h2 class="mb-4 text-lg font-semibold">New agent</h2>
+        <section v-else class="space-y-4">
+            <h2 class="text-lg font-semibold">New agent</h2>
             <Form
                 action="/admin/agents"
                 method="post"
@@ -153,14 +162,16 @@ const openEdit = (agent: Agent) => {
             </Form>
         </section>
 
-        <section class="rounded-xl border bg-card text-card-foreground shadow-sm">
-            <Table>
+        <section class="overflow-x-auto rounded-lg border text-card-foreground">
+            <Table class="min-w-[760px]">
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Brand</TableHead>
-                        <TableHead>Public link</TableHead>
-                        <TableHead class="w-40 text-right">Actions</TableHead>
+                        <TableHead class="px-5">Name</TableHead>
+                        <TableHead class="px-5">Brand</TableHead>
+                        <TableHead class="px-5">Public link</TableHead>
+                        <TableHead class="w-72 px-5 text-right"
+                            >Actions</TableHead
+                        >
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -168,11 +179,13 @@ const openEdit = (agent: Agent) => {
                         No agents yet.
                     </TableEmpty>
                     <TableRow v-for="agent in agents" :key="agent.id">
-                        <TableCell class="font-medium">
+                        <TableCell class="px-5 py-4 font-medium">
                             {{ agent.name }}
                         </TableCell>
-                        <TableCell>{{ agent.brand ?? '—' }}</TableCell>
-                        <TableCell>
+                        <TableCell class="px-5 py-4">{{
+                            agent.brand ?? '—'
+                        }}</TableCell>
+                        <TableCell class="px-5 py-4">
                             <Link
                                 :href="`/${agent.slug}`"
                                 class="font-mono text-sm text-primary hover:underline"
@@ -180,11 +193,11 @@ const openEdit = (agent: Agent) => {
                                 /{{ agent.slug }}
                             </Link>
                         </TableCell>
-                        <TableCell class="text-right">
-                            <div class="flex justify-end gap-1">
+                        <TableCell class="px-5 py-4 text-right">
+                            <div class="flex justify-end gap-2">
                                 <Button
-                                    variant="ghost"
-                                    size="icon"
+                                    variant="secondary"
+                                    size="sm"
                                     @click="copyLink(agent)"
                                     :title="
                                         justCopied === agent.id
@@ -192,23 +205,30 @@ const openEdit = (agent: Agent) => {
                                             : 'Copy link'
                                     "
                                 >
-                                    <Copy class="h-4 w-4" />
+                                    <Copy class="mr-2 h-4 w-4" />
+                                    {{
+                                        justCopied === agent.id
+                                            ? 'Copied'
+                                            : 'Copy'
+                                    }}
                                 </Button>
                                 <Button
-                                    variant="ghost"
-                                    size="icon"
+                                    variant="default"
+                                    size="sm"
                                     @click="openEdit(agent)"
                                     title="Edit"
                                 >
-                                    <Pencil class="h-4 w-4" />
+                                    <Pencil class="mr-2 h-4 w-4" />
+                                    Edit
                                 </Button>
                                 <Button
-                                    variant="ghost"
-                                    size="icon"
+                                    variant="destructive"
+                                    size="sm"
                                     @click="destroy(agent)"
                                     title="Delete"
                                 >
-                                    <Trash2 class="h-4 w-4 text-destructive" />
+                                    <Trash2 class="mr-2 h-4 w-4" />
+                                    Delete
                                 </Button>
                             </div>
                         </TableCell>
@@ -230,7 +250,7 @@ const openEdit = (agent: Agent) => {
                     :action="`/admin/agents/${editing.id}`"
                     method="patch"
                     v-slot="{ errors, processing }"
-                    :options="{ onSuccess: () => (editing = null) }"
+                    @success="editing = null"
                     class="grid gap-4"
                 >
                     <div class="grid gap-2">
@@ -275,6 +295,41 @@ const openEdit = (agent: Agent) => {
                         </Button>
                     </DialogFooter>
                 </Form>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog
+            :open="deleting !== null"
+            @update:open="(open) => !open && (deleting = null)"
+        >
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Delete agent</DialogTitle>
+                </DialogHeader>
+                <Alert variant="destructive">
+                    <TriangleAlert class="h-4 w-4" />
+                    <AlertTitle>Confirm deletion</AlertTitle>
+                    <AlertDescription>
+                        This will delete "{{ deleting?.name }}". This action
+                        cannot be undone.
+                    </AlertDescription>
+                </Alert>
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="deleting = null"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        @click="confirmDestroy"
+                    >
+                        Delete agent
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     </div>

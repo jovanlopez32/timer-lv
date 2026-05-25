@@ -2,13 +2,25 @@
 import { Head, router } from '@inertiajs/vue3';
 import {
     CalendarDate,
-    type DateValue,
     getLocalTimeZone,
     parseDate,
     today,
 } from '@internationalized/date';
-import { CalendarIcon, Check, ChevronsUpDown, Search, X } from 'lucide-vue-next';
+import {
+    CalendarIcon,
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsUpDown,
+    Download,
+    Pencil,
+    Search,
+    Trash2,
+    TriangleAlert,
+    X,
+} from 'lucide-vue-next';
 import { computed, ref } from 'vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Command,
@@ -18,6 +30,14 @@ import {
     CommandItem,
     CommandList,
 } from '@/components/ui/command';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Popover,
@@ -25,6 +45,13 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { RangeCalendar } from '@/components/ui/range-calendar';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -42,8 +69,11 @@ type TaskType = { id: number; name: string };
 type TimerRow = {
     id: number;
     agent: string;
+    brand: string | null;
+    task_type_id: number;
     task_type: string;
     decimal_hours: number;
+    started_at: string | null;
     ended_at: string | null;
 };
 
@@ -55,7 +85,15 @@ type Filters = {
 
 const props = defineProps<{
     taskTypes: TaskType[];
-    timers: TimerRow[];
+    timers: {
+        data: TimerRow[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+        from: number | null;
+        to: number | null;
+    };
     filters: Filters;
     totalHours: number;
 }>();
@@ -82,11 +120,19 @@ const parseISODate = (value: string | null): CalendarDate | undefined => {
 
 const selectedTaskTypeId = ref<number | null>(props.filters.task_type_id);
 const taskTypeOpen = ref(false);
-const dateRange = ref<{ start: DateValue | undefined; end: DateValue | undefined }>({
+const dateRange = ref<any>({
     start: parseISODate(props.filters.from),
     end: parseISODate(props.filters.to),
 });
 const calendarOpen = ref(false);
+const editing = ref<TimerRow | null>(null);
+const deleting = ref<TimerRow | null>(null);
+const editForm = ref({
+    task_type_id: '',
+    decimal_hours: '',
+    started_at: '',
+    ended_at: '',
+});
 
 const selectedTaskType = computed<TaskType | null>(
     () =>
@@ -103,6 +149,17 @@ const formatDate = (iso: string | null) => {
         return '—';
     }
     return new Date(iso).toLocaleString();
+};
+
+const toDateTimeLocal = (iso: string | null) => {
+    if (!iso) {
+        return '';
+    }
+
+    const date = new Date(iso);
+    const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+
+    return local.toISOString().slice(0, 16);
 };
 
 const formatRangeLabel = computed(() => {
@@ -145,6 +202,87 @@ const reset = () => {
     );
 };
 
+const exportUrl = computed(() => {
+    const params = new URLSearchParams();
+
+    if (selectedTaskTypeId.value !== null) {
+        params.set('task_type_id', String(selectedTaskTypeId.value));
+    }
+    if (dateRange.value.start) {
+        params.set('from', dateRange.value.start.toString());
+    }
+    if (dateRange.value.end) {
+        params.set('to', dateRange.value.end.toString());
+    }
+
+    const query = params.toString();
+
+    return query ? `/admin/reports/export?${query}` : '/admin/reports/export';
+});
+
+const changePage = (page: number) => {
+    router.get(
+        '/admin/reports',
+        {
+            task_type_id: selectedTaskTypeId.value ?? undefined,
+            from: dateRange.value.start
+                ? dateRange.value.start.toString()
+                : undefined,
+            to: dateRange.value.end
+                ? dateRange.value.end.toString()
+                : undefined,
+            page,
+        },
+        { preserveState: true, preserveScroll: true },
+    );
+};
+
+const openEdit = (timer: TimerRow) => {
+    editing.value = timer;
+    editForm.value = {
+        task_type_id: String(timer.task_type_id),
+        decimal_hours: timer.decimal_hours.toFixed(2),
+        started_at: toDateTimeLocal(timer.started_at),
+        ended_at: toDateTimeLocal(timer.ended_at),
+    };
+};
+
+const saveEdit = () => {
+    if (!editing.value) {
+        return;
+    }
+
+    router.patch(
+        `/admin/reports/${editing.value.id}`,
+        {
+            task_type_id: editForm.value.task_type_id,
+            decimal_hours: editForm.value.decimal_hours,
+            started_at: editForm.value.started_at,
+            ended_at: editForm.value.ended_at,
+        },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                editing.value = null;
+            },
+        },
+    );
+};
+
+const destroy = (timer: TimerRow) => {
+    deleting.value = timer;
+};
+
+const confirmDestroy = () => {
+    if (!deleting.value) {
+        return;
+    }
+
+    const timer = deleting.value;
+    deleting.value = null;
+    router.delete(`/admin/reports/${timer.id}`, { preserveScroll: true });
+};
+
 const initialRange = today(getLocalTimeZone());
 </script>
 
@@ -159,10 +297,10 @@ const initialRange = today(getLocalTimeZone());
             </p>
         </header>
 
-        <section
-            class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm"
-        >
-            <div class="grid gap-4 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+        <section class="text-card-foreground">
+            <div
+                class="grid gap-4 md:grid-cols-[1fr_1fr_auto_auto] md:items-end"
+            >
                 <div class="grid gap-2">
                     <Label>Task type</Label>
                     <Popover v-model:open="taskTypeOpen">
@@ -275,49 +413,234 @@ const initialRange = today(getLocalTimeZone());
             </div>
         </section>
 
-        <section class="rounded-xl border bg-card text-card-foreground shadow-sm">
+        <section class="overflow-x-auto rounded-lg border text-card-foreground">
             <div
-                class="flex items-center justify-between border-b p-4 text-sm text-muted-foreground"
+                class="flex items-center justify-between gap-4 border-b px-5 py-4 text-sm text-muted-foreground"
             >
                 <span>
                     Showing
                     <span class="font-medium text-foreground">
-                        {{ timers.length }}
+                        {{ timers.from ?? 0 }}-{{ timers.to ?? 0 }}
                     </span>
-                    {{ timers.length === 1 ? 'timer' : 'timers' }}
-                </span>
-                <span>
-                    Total:
-                    <span class="font-medium text-foreground tabular-nums">
-                        {{ totalHours.toFixed(2) }} hours
+                    of
+                    <span class="font-medium text-foreground">
+                        {{ timers.total }}
                     </span>
+                    timers
                 </span>
+                <div class="flex items-center gap-4">
+                    <span>
+                        Total:
+                        <span class="font-medium text-foreground tabular-nums">
+                            {{ totalHours.toFixed(2) }} hours
+                        </span>
+                    </span>
+                    <Button as-child variant="outline" size="sm">
+                        <a :href="exportUrl">
+                            <Download class="mr-2 h-4 w-4" />
+                            Export to Excel
+                        </a>
+                    </Button>
+                </div>
             </div>
-            <Table>
+            <Table class="min-w-[1180px]">
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Agent</TableHead>
-                        <TableHead>Task type</TableHead>
-                        <TableHead class="text-right">Hours</TableHead>
-                        <TableHead>Ended at</TableHead>
+                        <TableHead class="px-5">Agent</TableHead>
+                        <TableHead class="px-5">Brand</TableHead>
+                        <TableHead class="px-5">Task type</TableHead>
+                        <TableHead class="px-5 text-right">Hours</TableHead>
+                        <TableHead class="px-5">Started at</TableHead>
+                        <TableHead class="px-5">Ended at</TableHead>
+                        <TableHead class="w-48 px-5 text-right"
+                            >Actions</TableHead
+                        >
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    <TableEmpty v-if="timers.length === 0" :colspan="4">
+                    <TableEmpty v-if="timers.data.length === 0" :colspan="7">
                         No timers match the filters.
                     </TableEmpty>
-                    <TableRow v-for="timer in timers" :key="timer.id">
-                        <TableCell class="font-medium">
+                    <TableRow v-for="timer in timers.data" :key="timer.id">
+                        <TableCell class="px-5 py-4 font-medium">
                             {{ timer.agent }}
                         </TableCell>
-                        <TableCell>{{ timer.task_type }}</TableCell>
-                        <TableCell class="text-right tabular-nums">
+                        <TableCell class="px-5 py-4">{{
+                            timer.brand ?? '—'
+                        }}</TableCell>
+                        <TableCell class="px-5 py-4">{{
+                            timer.task_type
+                        }}</TableCell>
+                        <TableCell class="px-5 py-4 text-right tabular-nums">
                             {{ timer.decimal_hours.toFixed(2) }}
                         </TableCell>
-                        <TableCell>{{ formatDate(timer.ended_at) }}</TableCell>
+                        <TableCell class="px-5 py-4">
+                            {{ formatDate(timer.started_at) }}
+                        </TableCell>
+                        <TableCell class="px-5 py-4">
+                            {{ formatDate(timer.ended_at) }}
+                        </TableCell>
+                        <TableCell class="px-5 py-4 text-right">
+                            <div class="flex justify-end gap-2">
+                                <Button
+                                    type="button"
+                                    variant="default"
+                                    size="sm"
+                                    @click="openEdit(timer)"
+                                >
+                                    <Pencil class="mr-2 h-4 w-4" />
+                                    Edit
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="destructive"
+                                    size="sm"
+                                    @click="destroy(timer)"
+                                >
+                                    <Trash2 class="mr-2 h-4 w-4" />
+                                    Delete
+                                </Button>
+                            </div>
+                        </TableCell>
                     </TableRow>
                 </TableBody>
             </Table>
+            <div class="flex items-center justify-between border-t px-5 py-4">
+                <div class="text-sm text-muted-foreground">
+                    Page {{ timers.current_page }} of {{ timers.last_page }}
+                </div>
+                <div class="flex items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        :disabled="timers.current_page <= 1"
+                        @click="changePage(timers.current_page - 1)"
+                    >
+                        <ChevronLeft class="mr-2 h-4 w-4" />
+                        Previous
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        :disabled="timers.current_page >= timers.last_page"
+                        @click="changePage(timers.current_page + 1)"
+                    >
+                        Next
+                        <ChevronRight class="ml-2 h-4 w-4" />
+                    </Button>
+                </div>
+            </div>
         </section>
+
+        <Dialog
+            :open="editing !== null"
+            @update:open="(open) => !open && (editing = null)"
+        >
+            <DialogContent class="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Edit report timer</DialogTitle>
+                </DialogHeader>
+                <div class="grid gap-4">
+                    <div class="grid gap-2">
+                        <Label for="edit-task-type">Task type</Label>
+                        <Select
+                            v-model="editForm.task_type_id"
+                            name="task_type_id"
+                        >
+                            <SelectTrigger id="edit-task-type">
+                                <SelectValue placeholder="Select task type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="taskType in taskTypes"
+                                    :key="taskType.id"
+                                    :value="String(taskType.id)"
+                                >
+                                    {{ taskType.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="edit-hours">Hours</Label>
+                        <Input
+                            id="edit-hours"
+                            v-model="editForm.decimal_hours"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                        />
+                    </div>
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div class="grid gap-2">
+                            <Label for="edit-started-at">Started at</Label>
+                            <Input
+                                id="edit-started-at"
+                                v-model="editForm.started_at"
+                                type="datetime-local"
+                            />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="edit-ended-at">Ended at</Label>
+                            <Input
+                                id="edit-ended-at"
+                                v-model="editForm.ended_at"
+                                type="datetime-local"
+                            />
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="editing = null"
+                    >
+                        Cancel
+                    </Button>
+                    <Button type="button" @click="saveEdit">
+                        Save changes
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog
+            :open="deleting !== null"
+            @update:open="(open) => !open && (deleting = null)"
+        >
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Delete report timer</DialogTitle>
+                </DialogHeader>
+                <Alert variant="destructive">
+                    <TriangleAlert class="h-4 w-4" />
+                    <AlertTitle>Confirm deletion</AlertTitle>
+                    <AlertDescription>
+                        This will delete the completed timer for "{{
+                            deleting?.agent
+                        }}". This action cannot be undone.
+                    </AlertDescription>
+                </Alert>
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="deleting = null"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        @click="confirmDestroy"
+                    >
+                        Delete timer
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
 </template>

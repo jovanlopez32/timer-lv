@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\TaskType;
 use App\Models\Timer;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportsController extends Controller
 {
@@ -17,30 +19,19 @@ class ReportsController extends Controller
             'task_type_id' => ['nullable', 'integer', 'exists:task_types,id'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
-
-        $hasFilters = ! empty($data['task_type_id']) || ! empty($data['from']) || ! empty($data['to']);
 
         $timersQuery = Timer::query()
             ->where('completed', true)
-            ->with(['agent:id,name,slug', 'taskType:id,name'])
+            ->with(['agent:id,name,slug,brand_id', 'agent.brand:id,name', 'taskType:id,name'])
             ->latest('ended_at');
 
-        if (! empty($data['task_type_id'])) {
-            $timersQuery->where('task_type_id', $data['task_type_id']);
-        }
-
-        if (! empty($data['from'])) {
-            $timersQuery->whereDate('ended_at', '>=', $data['from']);
-        }
-
-        if (! empty($data['to'])) {
-            $timersQuery->whereDate('ended_at', '<=', $data['to']);
-        }
-
-        $timers = $hasFilters
-            ? $timersQuery->get()
-            : $timersQuery->limit(50)->get();
+        $timersQuery = $this->applyFilters($timersQuery, $data);
+        $totalHours = (clone $timersQuery)->sum('decimal_hours');
+        $timers = $timersQuery
+            ->paginate(50)
+            ->withQueryString();
 
         return Inertia::render('admin/Reports', [
             'taskTypes' => TaskType::query()
@@ -51,14 +42,108 @@ class ReportsController extends Controller
                 'from' => $data['from'] ?? null,
                 'to' => $data['to'] ?? null,
             ],
-            'timers' => $timers->map(fn (Timer $timer) => [
-                'id' => $timer->id,
-                'agent' => $timer->agent->name,
-                'task_type' => $timer->taskType->name,
-                'decimal_hours' => (float) $timer->decimal_hours,
-                'ended_at' => $timer->ended_at?->toIso8601String(),
-            ]),
-            'totalHours' => round((float) $timers->sum('decimal_hours'), 2),
+            'timers' => [
+                'data' => $timers->getCollection()->map(fn (Timer $timer) => [
+                    'id' => $timer->id,
+                    'agent' => $timer->agent->name,
+                    'brand' => $timer->agent->brand?->name,
+                    'task_type_id' => $timer->task_type_id,
+                    'task_type' => $timer->taskType->name,
+                    'decimal_hours' => (float) $timer->decimal_hours,
+                    'started_at' => $timer->started_at?->toIso8601String(),
+                    'ended_at' => $timer->ended_at?->toIso8601String(),
+                ]),
+                'current_page' => $timers->currentPage(),
+                'last_page' => $timers->lastPage(),
+                'per_page' => $timers->perPage(),
+                'total' => $timers->total(),
+                'from' => $timers->firstItem(),
+                'to' => $timers->lastItem(),
+            ],
+            'totalHours' => round((float) $totalHours, 2),
         ]);
+    }
+
+    public function update(Request $request, Timer $timer): RedirectResponse
+    {
+        abort_unless($timer->completed, 404);
+
+        $data = $request->validate([
+            'task_type_id' => ['required', 'integer', 'exists:task_types,id'],
+            'decimal_hours' => ['required', 'numeric', 'min:0'],
+            'started_at' => ['required', 'date'],
+            'ended_at' => ['required', 'date', 'after_or_equal:started_at'],
+        ]);
+
+        $timer->update([
+            'task_type_id' => $data['task_type_id'],
+            'decimal_hours' => round((float) $data['decimal_hours'], 2),
+            'started_at' => $data['started_at'],
+            'ended_at' => $data['ended_at'],
+        ]);
+
+        return back();
+    }
+
+    public function destroy(Timer $timer): RedirectResponse
+    {
+        abort_unless($timer->completed, 404);
+
+        $timer->delete();
+
+        return back();
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $data = $request->validate([
+            'task_type_id' => ['nullable', 'integer', 'exists:task_types,id'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $query = Timer::query()
+            ->where('completed', true)
+            ->with(['agent:id,name,brand_id', 'agent.brand:id,name', 'taskType:id,name'])
+            ->latest('ended_at');
+
+        $query = $this->applyFilters($query, $data);
+
+        return response()->streamDownload(function () use ($query): void {
+            $output = fopen('php://output', 'w');
+            fputcsv($output, ['Agent', 'Brand', 'Task type', 'Hours', 'Started at', 'Ended at']);
+
+            foreach ($query->lazy(500) as $timer) {
+                fputcsv($output, [
+                    $timer->agent->name,
+                    $timer->agent->brand?->name,
+                    $timer->taskType->name,
+                    number_format((float) $timer->decimal_hours, 2, '.', ''),
+                    $timer->started_at?->toDateTimeString(),
+                    $timer->ended_at?->toDateTimeString(),
+                ]);
+            }
+
+            fclose($output);
+        }, 'reports-export.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    private function applyFilters($query, array $data)
+    {
+        if (! empty($data['task_type_id'])) {
+            $query->where('task_type_id', $data['task_type_id']);
+        }
+
+        if (! empty($data['from'])) {
+            $query->whereDate('ended_at', '>=', $data['from']);
+        }
+
+        if (! empty($data['to'])) {
+            $query->whereDate('ended_at', '<=', $data['to']);
+        }
+
+        return $query;
     }
 }

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Form, Head, Link, router } from '@inertiajs/vue3';
-import { Pencil, Trash2 } from 'lucide-vue-next';
+import { Pencil, Trash2, TriangleAlert } from 'lucide-vue-next';
 import { ref } from 'vue';
 import InputError from '@/components/InputError.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -55,6 +56,7 @@ defineOptions({
 });
 
 const editing = ref<TaskType | null>(null);
+const deleting = ref<TaskType | null>(null);
 const newBrandId = ref<string | undefined>(
     props.brands.length > 0 ? String(props.brands[0].id) : undefined,
 );
@@ -66,9 +68,16 @@ const openEdit = (taskType: TaskType) => {
 };
 
 const destroy = (taskType: TaskType) => {
-    if (!window.confirm(`Delete task type "${taskType.name}"?`)) {
+    deleting.value = taskType;
+};
+
+const confirmDestroy = () => {
+    if (!deleting.value) {
         return;
     }
+
+    const taskType = deleting.value;
+    deleting.value = null;
     router.delete(`/admin/task-types/${taskType.id}`, {
         preserveScroll: true,
     });
@@ -89,20 +98,20 @@ const destroy = (taskType: TaskType) => {
 
         <section
             v-if="brands.length === 0"
-            class="rounded-xl border border-dashed bg-card p-6 text-sm text-muted-foreground"
+            class="rounded-lg border border-dashed p-6 text-sm text-muted-foreground"
         >
             You need to
-            <Link href="/admin/brands" class="font-medium text-primary hover:underline">
+            <Link
+                href="/admin/brands"
+                class="font-medium text-primary hover:underline"
+            >
                 create a brand
             </Link>
             before adding task types.
         </section>
 
-        <section
-            v-else
-            class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm"
-        >
-            <h2 class="mb-4 text-lg font-semibold">New task type</h2>
+        <section v-else class="space-y-4">
+            <h2 class="text-lg font-semibold">New task type</h2>
             <Form
                 action="/admin/task-types"
                 method="post"
@@ -140,44 +149,47 @@ const destroy = (taskType: TaskType) => {
             </Form>
         </section>
 
-        <section class="rounded-xl border bg-card text-card-foreground shadow-sm">
-            <Table>
+        <section class="overflow-x-auto rounded-lg border text-card-foreground">
+            <Table class="min-w-[640px]">
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Brand</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead class="w-32 text-right">Actions</TableHead>
+                        <TableHead class="px-5">Brand</TableHead>
+                        <TableHead class="px-5">Name</TableHead>
+                        <TableHead class="w-48 px-5 text-right"
+                            >Actions</TableHead
+                        >
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     <TableEmpty v-if="taskTypes.length === 0" :colspan="3">
                         No task types yet.
                     </TableEmpty>
-                    <TableRow
-                        v-for="taskType in taskTypes"
-                        :key="taskType.id"
-                    >
-                        <TableCell>{{ taskType.brand ?? '—' }}</TableCell>
-                        <TableCell class="font-medium">
+                    <TableRow v-for="taskType in taskTypes" :key="taskType.id">
+                        <TableCell class="px-5 py-4">{{
+                            taskType.brand ?? '—'
+                        }}</TableCell>
+                        <TableCell class="px-5 py-4 font-medium">
                             {{ taskType.name }}
                         </TableCell>
-                        <TableCell class="text-right">
-                            <div class="flex justify-end gap-1">
+                        <TableCell class="px-5 py-4 text-right">
+                            <div class="flex justify-end gap-2">
                                 <Button
-                                    variant="ghost"
-                                    size="icon"
+                                    variant="default"
+                                    size="sm"
                                     @click="openEdit(taskType)"
                                     title="Edit"
                                 >
-                                    <Pencil class="h-4 w-4" />
+                                    <Pencil class="mr-2 h-4 w-4" />
+                                    Edit
                                 </Button>
                                 <Button
-                                    variant="ghost"
-                                    size="icon"
+                                    variant="destructive"
+                                    size="sm"
                                     @click="destroy(taskType)"
                                     title="Delete"
                                 >
-                                    <Trash2 class="h-4 w-4 text-destructive" />
+                                    <Trash2 class="mr-2 h-4 w-4" />
+                                    Delete
                                 </Button>
                             </div>
                         </TableCell>
@@ -199,7 +211,7 @@ const destroy = (taskType: TaskType) => {
                     :action="`/admin/task-types/${editing.id}`"
                     method="patch"
                     v-slot="{ errors, processing }"
-                    :options="{ onSuccess: () => (editing = null) }"
+                    @success="editing = null"
                     class="grid gap-4"
                 >
                     <div class="grid gap-2">
@@ -244,6 +256,41 @@ const destroy = (taskType: TaskType) => {
                         </Button>
                     </DialogFooter>
                 </Form>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog
+            :open="deleting !== null"
+            @update:open="(open) => !open && (deleting = null)"
+        >
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Delete task type</DialogTitle>
+                </DialogHeader>
+                <Alert variant="destructive">
+                    <TriangleAlert class="h-4 w-4" />
+                    <AlertTitle>Confirm deletion</AlertTitle>
+                    <AlertDescription>
+                        This will delete "{{ deleting?.name }}". This action
+                        cannot be undone.
+                    </AlertDescription>
+                </Alert>
+                <DialogFooter>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        @click="deleting = null"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        @click="confirmDestroy"
+                    >
+                        Delete task type
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     </div>

@@ -50,27 +50,25 @@ const formatDate = (iso: string | null) => {
 <template>
     <Head title="Dashboard" />
 
-    <div class="flex h-full flex-1 flex-col gap-6 p-6">
-        <div class="grid gap-4 md:grid-cols-3">
+    <div class="flex h-full flex-1 flex-col gap-8 p-6">
+        <div class="grid gap-3 md:grid-cols-3">
             <Link
                 href="/admin/agents"
-                class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm transition hover:bg-accent/40"
+                class="rounded-lg bg-muted/40 p-5 text-card-foreground transition hover:bg-muted"
             >
                 <p class="text-sm font-medium text-muted-foreground">Agents</p>
                 <p class="mt-2 text-3xl font-semibold">{{ stats.agents }}</p>
             </Link>
             <Link
                 href="/admin/task-types"
-                class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm transition hover:bg-accent/40"
+                class="rounded-lg bg-muted/40 p-5 text-card-foreground transition hover:bg-muted"
             >
                 <p class="text-sm font-medium text-muted-foreground">
                     Task types
                 </p>
                 <p class="mt-2 text-3xl font-semibold">{{ stats.taskTypes }}</p>
             </Link>
-            <div
-                class="rounded-xl border bg-card p-6 text-card-foreground shadow-sm"
-            >
+            <div class="rounded-lg bg-muted/40 p-5 text-card-foreground">
                 <p class="text-sm font-medium text-muted-foreground">
                     Total timers
                 </p>
@@ -78,38 +76,49 @@ const formatDate = (iso: string | null) => {
             </div>
         </div>
 
-        <div class="rounded-xl border bg-card text-card-foreground shadow-sm">
-            <div class="border-b p-4">
+        <div class="text-card-foreground">
+            <div class="mb-3">
                 <h2 class="text-lg font-semibold">Recent completed timers</h2>
                 <p class="text-sm text-muted-foreground">
                     Last 10 finished timers across all agents.
                 </p>
             </div>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Agent</TableHead>
-                        <TableHead>Task type</TableHead>
-                        <TableHead class="text-right">Hours</TableHead>
-                        <TableHead>Ended at</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    <TableEmpty v-if="recentTimers.length === 0" :colspan="4">
-                        No timers completed yet.
-                    </TableEmpty>
-                    <TableRow v-for="timer in recentTimers" :key="timer.id">
-                        <TableCell class="font-medium">
-                            {{ timer.agent }}
-                        </TableCell>
-                        <TableCell>{{ timer.task_type }}</TableCell>
-                        <TableCell class="text-right tabular-nums">
-                            {{ timer.decimal_hours.toFixed(2) }}
-                        </TableCell>
-                        <TableCell>{{ formatDate(timer.ended_at) }}</TableCell>
-                    </TableRow>
-                </TableBody>
-            </Table>
+            <div class="overflow-hidden rounded-lg border">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead class="px-5">Agent</TableHead>
+                            <TableHead class="px-5">Task type</TableHead>
+                            <TableHead class="px-5 text-right">Hours</TableHead>
+                            <TableHead class="px-5">Ended at</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        <TableEmpty
+                            v-if="recentTimers.length === 0"
+                            :colspan="4"
+                        >
+                            No timers completed yet.
+                        </TableEmpty>
+                        <TableRow v-for="timer in recentTimers" :key="timer.id">
+                            <TableCell class="px-5 py-4 font-medium">
+                                {{ timer.agent }}
+                            </TableCell>
+                            <TableCell class="px-5 py-4">{{
+                                timer.task_type
+                            }}</TableCell>
+                            <TableCell
+                                class="px-5 py-4 text-right tabular-nums"
+                            >
+                                {{ timer.decimal_hours.toFixed(2) }}
+                            </TableCell>
+                            <TableCell class="px-5 py-4">{{
+                                formatDate(timer.ended_at)
+                            }}</TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
+            </div>
         </div>
     </div>
 </template>

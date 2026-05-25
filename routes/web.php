@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AgentController;
+use App\Http\Controllers\Admin\ActiveWorkController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ReportsController;
@@ -18,7 +19,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::prefix('admin')->group(function () {
+        Route::get('active-work', [ActiveWorkController::class, 'index'])->name('active-work.index');
         Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
+        Route::get('reports/export', [ReportsController::class, 'export'])->name('reports.export');
+        Route::patch('reports/{timer:id}', [ReportsController::class, 'update'])->name('reports.update');
+        Route::delete('reports/{timer:id}', [ReportsController::class, 'destroy'])->name('reports.destroy');
         Route::get('stats', [StatsController::class, 'index'])->name('stats.index');
 
         Route::get('brands', [BrandController::class, 'index'])->name('brands.index');

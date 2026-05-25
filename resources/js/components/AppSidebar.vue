@@ -6,6 +6,7 @@ import {
     FolderGit2,
     LayoutGrid,
     ListChecks,
+    PlayCircle,
     PieChart,
     Tag,
     Users,
@@ -31,6 +32,11 @@ const platformItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Active work',
+        href: '/admin/active-work',
+        icon: PlayCircle,
     },
     {
         title: 'Reports',
