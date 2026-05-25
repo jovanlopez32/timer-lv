@@ -362,9 +362,9 @@ const timerSectionClass = computed(() =>
             </header>
 
             <section class="space-y-2">
-                <span class="text-sm font-medium text-foreground">
+                <p class="text-sm font-medium text-foreground mb-1.5">
                     Task type
-                </span>
+                </p>
                 <Popover v-model:open="comboboxOpen">
                     <PopoverTrigger as-child>
                         <Button
@@ -453,7 +453,7 @@ const timerSectionClass = computed(() =>
                                 class="absolute right-0 top-0 h-8 w-8 text-muted-foreground"
                                 @click="togglePip"
                             >
-                                <X v-if="pipOpen" class="h-4 w-4" />
+                                <X v-if="pipOpen" class="h-4 w-4 hidden" />
                                 <PictureInPicture2 v-else class="h-4 w-4" />
                                 <span class="sr-only">
                                     {{
@@ -464,7 +464,7 @@ const timerSectionClass = computed(() =>
                                 </span>
                             </Button>
                             <p
-                                class="text-center font-mono text-6xl font-light tracking-widest tabular-nums"
+                                class="text-center font-mono text-4xl font-light tracking-widest tabular-nums"
                             >
                                 {{ formattedElapsed }}
                             </p>

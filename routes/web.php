@@ -8,9 +8,10 @@ use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\TaskTypeController;
 use App\Http\Controllers\PublicTimerController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::get('/', function () {
-    return 'Welcome ';
+      return Inertia::render('Welcome');
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
