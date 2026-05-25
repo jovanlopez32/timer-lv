@@ -18,12 +18,12 @@ class DatabaseSeeder extends Seeder
             ['email' => 'jorge.linan@leadventure.com'],
             [
                 'name' => 'Jorge Linan',
-                'password' => Hash::make('Password'),
+                'password' => Hash::make('$Milk#Chocolate32'),
                 'email_verified_at' => now(),
             ],
         );
 
-        $brandsWithTaskTypes = [
+        /* $brandsWithTaskTypes = [
             'Leadventure' => ['Design', 'Development', 'QA', 'Meeting', 'Research'],
             'Acme' => ['Support', 'Sales call', 'Onboarding'],
         ];
@@ -58,6 +58,6 @@ class DatabaseSeeder extends Seeder
                     'brand_id' => $brands[$agent['brand']]->id,
                 ],
             );
-        }
+        } */
     }
 }
