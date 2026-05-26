@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\Admin\AgentController;
 use App\Http\Controllers\Admin\ActiveWorkController;
+use App\Http\Controllers\Admin\AgentController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ReportsController;
@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', function () {
-      return Inertia::render('Welcome');
+    return Inertia::render('Welcome');
 })->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -47,6 +47,8 @@ require __DIR__.'/settings.php';
 
 Route::post('timers/{timer}/pause', [PublicTimerController::class, 'pause'])->name('agent.timer.pause');
 Route::post('timers/{timer}/resume', [PublicTimerController::class, 'resume'])->name('agent.timer.resume');
+Route::post('timers/{timer}/park', [PublicTimerController::class, 'park'])->name('agent.timer.park');
+Route::post('timers/{timer}/unpark', [PublicTimerController::class, 'unpark'])->name('agent.timer.unpark');
 Route::post('timers/{timer}/complete', [PublicTimerController::class, 'complete'])->name('agent.timer.complete');
 Route::post('{agent}/timers', [PublicTimerController::class, 'start'])->name('agent.timer.start');
 Route::get('{agent}', [PublicTimerController::class, 'show'])->name('agent.timer');

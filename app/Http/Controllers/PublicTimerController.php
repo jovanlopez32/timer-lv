@@ -24,6 +24,23 @@ class PublicTimerController extends Controller
             ->with(['taskType', 'sessions'])
             ->first();
 
+        $parkedTimers = Timer::query()
+            ->where('agent_id', $agent->id)
+            ->parked()
+            ->with(['taskType', 'sessions'])
+            ->orderBy('parked_at')
+            ->get()
+            ->map(fn (Timer $timer) => [
+                'id' => $timer->id,
+                'task_type' => [
+                    'id' => $timer->taskType->id,
+                    'name' => $timer->taskType->name,
+                ],
+                'parked_at' => $timer->parked_at?->toIso8601String(),
+                'elapsed_seconds' => $timer->elapsedSeconds(),
+            ])
+            ->all();
+
         $payload = null;
 
         if ($activeTimer) {
@@ -52,6 +69,7 @@ class PublicTimerController extends Controller
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'activeTimer' => $payload,
+            'parkedTimers' => $parkedTimers,
         ]);
     }
 
@@ -110,6 +128,43 @@ class PublicTimerController extends Controller
         $timer->sessions()->create([
             'started_at' => now(),
         ]);
+
+        return redirect()->route('agent.timer', $timer->agent);
+    }
+
+    public function park(Timer $timer): RedirectResponse
+    {
+        abort_if($timer->completed, 422, 'Timer is already completed.');
+        abort_if($timer->isParked(), 422, 'Timer is already parked.');
+
+        if ($timer->currentSession() !== null) {
+            throw ValidationException::withMessages([
+                'timer' => 'Pause the timer before parking it.',
+            ]);
+        }
+
+        $timer->update(['parked_at' => now()]);
+
+        return redirect()->route('agent.timer', $timer->agent);
+    }
+
+    public function unpark(Timer $timer): RedirectResponse
+    {
+        abort_if($timer->completed, 422, 'Timer is already completed.');
+        abort_if(! $timer->isParked(), 422, 'Timer is not parked.');
+
+        $hasActive = Timer::query()
+            ->where('agent_id', $timer->agent_id)
+            ->active()
+            ->exists();
+
+        if ($hasActive) {
+            throw ValidationException::withMessages([
+                'timer' => 'Park the current active task before resuming another.',
+            ]);
+        }
+
+        $timer->update(['parked_at' => null]);
 
         return redirect()->route('agent.timer', $timer->agent);
     }

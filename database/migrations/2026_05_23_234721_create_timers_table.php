@@ -17,11 +17,13 @@ return new class extends Migration
             $table->foreignId('task_type_id')->constrained()->restrictOnDelete();
             $table->timestamp('started_at');
             $table->timestamp('ended_at')->nullable();
+            $table->timestamp('parked_at')->nullable();
             $table->decimal('decimal_hours', 8, 2)->nullable();
             $table->boolean('completed')->default(false)->index();
             $table->timestamps();
 
             $table->index(['agent_id', 'completed']);
+            $table->index(['agent_id', 'parked_at']);
         });
     }
 

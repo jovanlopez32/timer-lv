@@ -28,6 +28,17 @@ class ActiveWorkTest extends TestCase
 
         TimerSession::factory()->for($runningTimer)->running()->create();
 
+        $parkedTimer = Timer::factory()->create([
+            'completed' => false,
+            'started_at' => now()->subMinutes(40),
+            'parked_at' => now()->subMinutes(5),
+        ]);
+
+        TimerSession::factory()->for($parkedTimer)->create([
+            'started_at' => now()->subMinutes(35),
+            'ended_at' => now()->subMinutes(20),
+        ]);
+
         $pausedTimer = Timer::factory()->create([
             'completed' => false,
             'started_at' => now()->subMinutes(50),
@@ -45,11 +56,13 @@ class ActiveWorkTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('admin/ActiveWork')
-                ->has('agents', 2)
+                ->has('agents', 3)
                 ->where('agents.0.id', $runningTimer->id)
                 ->where('agents.0.status', 'in_progress')
-                ->where('agents.1.id', $pausedTimer->id)
-                ->where('agents.1.status', 'on_hold'),
+                ->where('agents.1.id', $parkedTimer->id)
+                ->where('agents.1.status', 'parked')
+                ->where('agents.2.id', $pausedTimer->id)
+                ->where('agents.2.status', 'on_hold'),
             );
     }
 }

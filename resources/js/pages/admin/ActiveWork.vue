@@ -9,7 +9,7 @@ type AgentWork = {
     agent: string;
     agent_slug: string;
     task_type: string;
-    status: 'in_progress' | 'on_hold';
+    status: 'in_progress' | 'on_hold' | 'parked';
     started_at: string | null;
 };
 
@@ -24,11 +24,25 @@ defineOptions({
     },
 });
 
-const statusLabel = (status: AgentWork['status']) =>
-    status === 'in_progress' ? 'In progress' : 'On hold';
+const statusLabel = (status: AgentWork['status']) => {
+    if (status === 'in_progress') {
+        return 'In progress';
+    }
+    if (status === 'parked') {
+        return 'Parked';
+    }
+    return 'On hold';
+};
 
-const statusVariant = (status: AgentWork['status']) =>
-    status === 'in_progress' ? 'default' : 'secondary';
+const statusVariant = (status: AgentWork['status']) => {
+    if (status === 'in_progress') {
+        return 'default';
+    }
+    if (status === 'parked') {
+        return 'outline';
+    }
+    return 'secondary';
+};
 
 const formatDate = (iso: string | null) => {
     if (!iso) {
