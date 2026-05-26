@@ -21,9 +21,11 @@ class ActiveWorkController extends Controller
                 'agent' => $timer->agent->name,
                 'agent_slug' => $timer->agent->slug,
                 'task_type' => $timer->taskType->name,
-                'status' => $timer->sessions->contains(fn ($session) => $session->ended_at === null)
-                    ? 'in_progress'
-                    : 'on_hold',
+                'status' => match (true) {
+                    $timer->isParked() => 'parked',
+                    $timer->sessions->contains(fn ($session) => $session->ended_at === null) => 'in_progress',
+                    default => 'on_hold',
+                },
                 'started_at' => $timer->started_at?->toIso8601String(),
             ])
             ->values();

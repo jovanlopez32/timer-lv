@@ -229,4 +229,136 @@ class PublicTimerTest extends TestCase
 
         $this->assertDatabaseCount('timers', 1);
     }
+
+    public function test_it_rejects_parking_a_running_timer(): void
+    {
+        Carbon::setTestNow('2026-05-23 08:00:00');
+
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
+
+        $timer = Timer::first();
+
+        $this->post("/timers/{$timer->id}/park")
+            ->assertSessionHasErrors('timer');
+
+        $this->assertNull($timer->fresh()->parked_at);
+    }
+
+    public function test_it_parks_a_paused_timer(): void
+    {
+        Carbon::setTestNow('2026-05-23 08:00:00');
+
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
+
+        Carbon::setTestNow('2026-05-23 09:00:00');
+        $timer = Timer::first();
+        $this->post("/timers/{$timer->id}/pause");
+
+        Carbon::setTestNow('2026-05-23 09:05:00');
+        $this->post("/timers/{$timer->id}/park")
+            ->assertRedirect("/{$agent->slug}");
+
+        $timer->refresh();
+        $this->assertNotNull($timer->parked_at);
+        $this->assertEquals('2026-05-23 09:05:00', $timer->parked_at->format('Y-m-d H:i:s'));
+    }
+
+    public function test_parked_timer_elapsed_seconds_stay_frozen(): void
+    {
+        Carbon::setTestNow('2026-05-23 08:00:00');
+
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create([
+            'slug' => 'parker',
+            'brand_id' => $brand->id,
+        ]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
+
+        Carbon::setTestNow('2026-05-23 08:10:00');
+        $timer = Timer::first();
+        $this->post("/timers/{$timer->id}/pause");
+        $this->post("/timers/{$timer->id}/park");
+
+        Carbon::setTestNow('2026-05-23 12:00:00');
+
+        $this->get('/parker')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('activeTimer', null)
+                ->has('parkedTimers', 1)
+                ->where('parkedTimers.0.elapsed_seconds', 600)
+                ->where('parkedTimers.0.id', $timer->id),
+            );
+    }
+
+    public function test_a_parked_timer_does_not_block_starting_a_new_one(): void
+    {
+        Carbon::setTestNow('2026-05-23 08:00:00');
+
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+        $otherTaskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
+        $timer = Timer::first();
+        $this->post("/timers/{$timer->id}/pause");
+        $this->post("/timers/{$timer->id}/park");
+
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $otherTaskType->id])
+            ->assertRedirect("/{$agent->slug}");
+
+        $this->assertDatabaseCount('timers', 2);
+    }
+
+    public function test_unpark_is_blocked_when_another_active_timer_exists(): void
+    {
+        Carbon::setTestNow('2026-05-23 08:00:00');
+
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+        $otherTaskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
+        $first = Timer::first();
+        $this->post("/timers/{$first->id}/pause");
+        $this->post("/timers/{$first->id}/park");
+
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $otherTaskType->id]);
+
+        $this->post("/timers/{$first->id}/unpark")
+            ->assertSessionHasErrors('timer');
+
+        $this->assertNotNull($first->fresh()->parked_at);
+    }
+
+    public function test_unpark_restores_a_parked_timer_as_paused(): void
+    {
+        Carbon::setTestNow('2026-05-23 08:00:00');
+
+        $brand = Brand::factory()->create();
+        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
+
+        $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
+        $timer = Timer::first();
+        $this->post("/timers/{$timer->id}/pause");
+        $this->post("/timers/{$timer->id}/park");
+
+        $this->post("/timers/{$timer->id}/unpark")
+            ->assertRedirect("/{$agent->slug}");
+
+        $timer->refresh();
+        $this->assertNull($timer->parked_at);
+        $this->assertFalse($timer->completed);
+        $this->assertNull($timer->currentSession());
+    }
 }

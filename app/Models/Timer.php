@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'task_type_id',
     'started_at',
     'ended_at',
+    'parked_at',
     'decimal_hours',
     'completed',
 ])]
@@ -32,6 +33,7 @@ class Timer extends Model
         return [
             'started_at' => 'datetime',
             'ended_at' => 'datetime',
+            'parked_at' => 'datetime',
             'completed' => 'boolean',
             'decimal_hours' => 'decimal:2',
         ];
@@ -54,7 +56,17 @@ class Timer extends Model
 
     public function scopeActive(Builder $query): Builder
     {
-        return $query->where('completed', false);
+        return $query->where('completed', false)->whereNull('parked_at');
+    }
+
+    public function scopeParked(Builder $query): Builder
+    {
+        return $query->where('completed', false)->whereNotNull('parked_at');
+    }
+
+    public function isParked(): bool
+    {
+        return $this->parked_at !== null && ! $this->completed;
     }
 
     public function currentSession(): ?TimerSession
