@@ -9,6 +9,7 @@ import {
     PlayCircle,
     PieChart,
     Tag,
+    UserCog,
     Users,
 } from 'lucide-vue-next';
 import AppLogo from '@/components/AppLogo.vue';
@@ -65,6 +66,11 @@ const settingsItems: NavItem[] = [
         title: 'Task types',
         href: '/admin/task-types',
         icon: ListChecks,
+    },
+    {
+        title: 'Users',
+        href: '/admin/users',
+        icon: UserCog,
     },
 ];
 

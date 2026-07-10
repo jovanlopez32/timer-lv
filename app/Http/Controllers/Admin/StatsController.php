@@ -3,19 +3,35 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Agent;
 use App\Models\Brand;
 use App\Models\Timer;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class StatsController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $hoursByTaskType = Timer::query()
+        $data = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'agent_ids' => ['nullable', 'array'],
+            'agent_ids.*' => ['integer', 'exists:agents,id'],
+        ]);
+
+        $agentIds = array_map('intval', $data['agent_ids'] ?? []);
+
+        $timersQuery = Timer::query()
             ->where('completed', true)
-            ->whereNotNull('decimal_hours')
+            ->whereNotNull('decimal_hours');
+
+        $timersQuery = $this->applyFilters($timersQuery, $data, $agentIds);
+
+        $hoursByTaskType = $timersQuery
             ->get(['task_type_id', 'decimal_hours'])
             ->groupBy('task_type_id')
             ->map(fn (Collection $rows) => $rows
@@ -48,7 +64,42 @@ class StatsController extends Controller
 
         return Inertia::render('admin/Stats', [
             'brands' => $brands,
+            'agents' => Agent::query()
+                ->with('brand:id,name')
+                ->orderBy('name')
+                ->get(['id', 'name', 'brand_id'])
+                ->map(fn (Agent $agent) => [
+                    'id' => $agent->id,
+                    'name' => $agent->name,
+                    'brand' => $agent->brand?->name,
+                ]),
+            'filters' => [
+                'from' => $data['from'] ?? null,
+                'to' => $data['to'] ?? null,
+                'agent_ids' => $agentIds,
+            ],
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<int, int>  $agentIds
+     */
+    private function applyFilters(Builder $query, array $data, array $agentIds): Builder
+    {
+        if (! empty($data['from'])) {
+            $query->whereDate('ended_at', '>=', $data['from']);
+        }
+
+        if (! empty($data['to'])) {
+            $query->whereDate('ended_at', '<=', $data['to']);
+        }
+
+        if ($agentIds !== []) {
+            $query->whereIn('agent_id', $agentIds);
+        }
+
+        return $query;
     }
 
     /**

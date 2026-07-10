@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Form, Head, Link, router } from '@inertiajs/vue3';
-import { Copy, Pencil, Trash2, TriangleAlert } from 'lucide-vue-next';
+import { Copy, Pencil, Plus, Trash2, TriangleAlert } from 'lucide-vue-next';
 import { ref } from 'vue';
 import InputError from '@/components/InputError.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -60,10 +60,17 @@ const justCopied = ref<number | null>(null);
 const editing = ref<Agent | null>(null);
 const deleting = ref<Agent | null>(null);
 
+const createOpen = ref(false);
 const newBrandId = ref<string | undefined>(
     props.brands.length > 0 ? String(props.brands[0].id) : undefined,
 );
 const editBrandId = ref<string | undefined>(undefined);
+
+const openCreate = () => {
+    newBrandId.value =
+        props.brands.length > 0 ? String(props.brands[0].id) : undefined;
+    createOpen.value = true;
+};
 
 const publicUrl = (slug: string) => `${window.location.origin}/${slug}`;
 
@@ -101,12 +108,18 @@ const openEdit = (agent: Agent) => {
     <Head title="Agents" />
 
     <div class="flex flex-1 flex-col gap-6 p-6">
-        <header>
-            <h1 class="text-2xl font-semibold">Agents</h1>
-            <p class="text-sm text-muted-foreground">
-                Create an agent, pick a brand, and share their public timer
-                link.
-            </p>
+        <header class="flex items-start justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-semibold">Agents</h1>
+                <p class="text-sm text-muted-foreground">
+                    Create an agent, pick a brand, and share their public
+                    timer link.
+                </p>
+            </div>
+            <Button v-if="brands.length > 0" @click="openCreate">
+                <Plus class="h-4 w-4" />
+                Add agent
+            </Button>
         </header>
 
         <section
@@ -123,46 +136,10 @@ const openEdit = (agent: Agent) => {
             before adding agents.
         </section>
 
-        <section v-else class="space-y-4">
-            <h2 class="text-lg font-semibold">New agent</h2>
-            <Form
-                action="/admin/agents"
-                method="post"
-                :reset-on-success="true"
-                v-slot="{ errors, processing }"
-                class="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end"
-            >
-                <div class="grid gap-2">
-                    <Label for="name">Name</Label>
-                    <Input id="name" name="name" required autocomplete="off" />
-                    <InputError :message="errors.name" />
-                </div>
-                <div class="grid gap-2">
-                    <Label for="brand_id">Brand</Label>
-                    <Select v-model="newBrandId" name="brand_id" required>
-                        <SelectTrigger id="brand_id">
-                            <SelectValue placeholder="Select a brand" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem
-                                v-for="brand in brands"
-                                :key="brand.id"
-                                :value="String(brand.id)"
-                            >
-                                {{ brand.name }}
-                            </SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <InputError :message="errors.brand_id" />
-                </div>
-                <Button type="submit" :disabled="processing">
-                    <Spinner v-if="processing" />
-                    Create agent
-                </Button>
-            </Form>
-        </section>
-
-        <section class="overflow-x-auto rounded-lg border text-card-foreground">
+        <section
+            v-if="brands.length > 0"
+            class="overflow-x-auto rounded-lg border text-card-foreground"
+        >
             <Table class="min-w-[760px]">
                 <TableHeader>
                     <TableRow>
@@ -236,6 +213,64 @@ const openEdit = (agent: Agent) => {
                 </TableBody>
             </Table>
         </section>
+
+        <Dialog v-model:open="createOpen">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Add agent</DialogTitle>
+                </DialogHeader>
+                <Form
+                    action="/admin/agents"
+                    method="post"
+                    :reset-on-success="true"
+                    v-slot="{ errors, processing }"
+                    @success="createOpen = false"
+                    class="grid gap-4"
+                >
+                    <div class="grid gap-2">
+                        <Label for="create-name">Name</Label>
+                        <Input
+                            id="create-name"
+                            name="name"
+                            required
+                            autocomplete="off"
+                        />
+                        <InputError :message="errors.name" />
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="create-brand_id">Brand</Label>
+                        <Select v-model="newBrandId" name="brand_id" required>
+                            <SelectTrigger id="create-brand_id">
+                                <SelectValue placeholder="Select a brand" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="brand in brands"
+                                    :key="brand.id"
+                                    :value="String(brand.id)"
+                                >
+                                    {{ brand.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <InputError :message="errors.brand_id" />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            @click="createOpen = false"
+                        >
+                            Cancel
+                        </Button>
+                        <Button type="submit" :disabled="processing">
+                            <Spinner v-if="processing" />
+                            Create agent
+                        </Button>
+                    </DialogFooter>
+                </Form>
+            </DialogContent>
+        </Dialog>
 
         <Dialog
             :open="editing !== null"

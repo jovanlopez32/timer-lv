@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\ReportsController;
 use App\Http\Controllers\Admin\StatsController;
 use App\Http\Controllers\Admin\TaskTypeController;
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\PublicTimerController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -40,6 +41,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('task-types', [TaskTypeController::class, 'store'])->name('task-types.store');
         Route::patch('task-types/{taskType:id}', [TaskTypeController::class, 'update'])->name('task-types.update');
         Route::delete('task-types/{taskType:id}', [TaskTypeController::class, 'destroy'])->name('task-types.destroy');
+
+        Route::get('users', [UserController::class, 'index'])->name('users.index');
+        Route::post('users', [UserController::class, 'store'])->name('users.store');
+        Route::patch('users/{user:id}', [UserController::class, 'update'])->name('users.update');
+        Route::put('users/{user:id}/password', [UserController::class, 'updatePassword'])->name('users.update-password');
+        Route::delete('users/{user:id}', [UserController::class, 'destroy'])->name('users.destroy');
     });
 });
 

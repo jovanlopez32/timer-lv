@@ -17,9 +17,17 @@ class AgentController extends Controller
     {
         return Inertia::render('admin/Agents', [
             'agents' => Agent::query()
+                ->join('brands', 'brands.id', '=', 'agents.brand_id')
                 ->with('brand:id,name')
-                ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'brand_id', 'created_at'])
+                ->orderBy('brands.name')
+                ->orderBy('agents.name')
+                ->get([
+                    'agents.id',
+                    'agents.name',
+                    'agents.slug',
+                    'agents.brand_id',
+                    'agents.created_at',
+                ])
                 ->map(fn (Agent $agent) => [
                     'id' => $agent->id,
                     'name' => $agent->name,
