@@ -30,6 +30,7 @@ type Brand = {
     id: number;
     name: string;
     slug: string;
+    color: string;
     agents_count: number;
     task_types_count: number;
     created_at: string;
@@ -87,12 +88,23 @@ const confirmDestroy = () => {
                 method="post"
                 :reset-on-success="true"
                 v-slot="{ errors, processing }"
-                class="grid gap-4 md:grid-cols-[1fr_auto] md:items-end"
+                class="grid gap-4 md:grid-cols-[1fr_auto_auto] md:items-end"
             >
                 <div class="grid gap-2">
                     <Label for="name">Name</Label>
                     <Input id="name" name="name" required autocomplete="off" />
                     <InputError :message="errors.name" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="color">Color</Label>
+                    <Input
+                        id="color"
+                        type="color"
+                        name="color"
+                        value="#6366f1"
+                        class="h-9 w-16 p-1"
+                    />
+                    <InputError :message="errors.color" />
                 </div>
                 <Button type="submit" :disabled="processing">
                     <Spinner v-if="processing" />
@@ -120,7 +132,13 @@ const confirmDestroy = () => {
                         No brands yet.
                     </TableEmpty>
                     <TableRow v-for="brand in brands" :key="brand.id">
-                        <TableCell class="px-5 py-4 font-medium">
+                        <TableCell
+                            class="flex items-center gap-2 px-5 py-4 font-medium"
+                        >
+                            <span
+                                class="h-3 w-3 shrink-0 rounded-full ring-1 ring-border"
+                                :style="{ backgroundColor: brand.color }"
+                            />
                             {{ brand.name }}
                         </TableCell>
                         <TableCell class="px-5 py-4 text-right tabular-nums">
@@ -182,6 +200,17 @@ const confirmDestroy = () => {
                         />
                         <InputError :message="errors.name" />
                     </div>
+                    <div class="grid gap-2">
+                        <Label for="edit-color">Color</Label>
+                        <Input
+                            id="edit-color"
+                            type="color"
+                            name="color"
+                            :default-value="editing.color"
+                            class="h-9 w-16 p-1"
+                        />
+                        <InputError :message="errors.color" />
+                    </div>
                     <DialogFooter>
                         <Button
                             type="button"
@@ -211,9 +240,10 @@ const confirmDestroy = () => {
                     <TriangleAlert class="h-4 w-4" />
                     <AlertTitle>Confirm deletion</AlertTitle>
                     <AlertDescription>
-                        This will delete "{{ deleting?.name }}" and its
-                        {{ deleting?.agents_count }} agent(s) and
-                        {{ deleting?.task_types_count }} task type(s). This
+                        This will delete "{{ deleting?.name }}", untag it from
+                        {{ deleting?.agents_count }} agent(s), and permanently
+                        delete its {{ deleting?.task_types_count }} task
+                        type(s) along with all time tracked under them. This
                         action cannot be undone.
                     </AlertDescription>
                 </Alert>

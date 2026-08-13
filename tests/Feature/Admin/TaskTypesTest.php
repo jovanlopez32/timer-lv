@@ -4,6 +4,8 @@ namespace Tests\Feature\Admin;
 
 use App\Models\Brand;
 use App\Models\TaskType;
+use App\Models\Timer;
+use App\Models\TimerSession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -84,15 +86,54 @@ class TaskTypesTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_delete_a_task_type(): void
+    public function test_deleting_a_task_type_requires_the_admins_password(): void
     {
         $user = User::factory()->create();
         $taskType = TaskType::factory()->create();
 
         $this->actingAs($user)
             ->delete("/admin/task-types/{$taskType->id}")
+            ->assertSessionHasErrors('password');
+
+        $this->assertDatabaseHas('task_types', ['id' => $taskType->id]);
+    }
+
+    public function test_deleting_a_task_type_rejects_the_wrong_password(): void
+    {
+        $user = User::factory()->create();
+        $taskType = TaskType::factory()->create();
+
+        $this->actingAs($user)
+            ->delete("/admin/task-types/{$taskType->id}", ['password' => 'wrong-password'])
+            ->assertSessionHasErrors('password');
+
+        $this->assertDatabaseHas('task_types', ['id' => $taskType->id]);
+    }
+
+    public function test_admin_can_delete_a_task_type_with_the_correct_password(): void
+    {
+        $user = User::factory()->create();
+        $taskType = TaskType::factory()->create();
+
+        $this->actingAs($user)
+            ->delete("/admin/task-types/{$taskType->id}", ['password' => 'password'])
             ->assertRedirect('/admin/task-types');
 
         $this->assertDatabaseMissing('task_types', ['id' => $taskType->id]);
+    }
+
+    public function test_deleting_a_task_type_cascades_its_timers_and_sessions(): void
+    {
+        $user = User::factory()->create();
+        $taskType = TaskType::factory()->create();
+        $timer = Timer::factory()->for($taskType, 'taskType')->completed(2.0)->create();
+        TimerSession::factory()->for($timer)->create();
+
+        $this->actingAs($user)
+            ->delete("/admin/task-types/{$taskType->id}", ['password' => 'password'])
+            ->assertRedirect('/admin/task-types');
+
+        $this->assertDatabaseMissing('timers', ['id' => $timer->id]);
+        $this->assertDatabaseMissing('timer_sessions', ['timer_id' => $timer->id]);
     }
 }

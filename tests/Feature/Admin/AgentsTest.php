@@ -41,15 +41,36 @@ class AgentsTest extends TestCase
         $this->actingAs($user)
             ->post('/admin/agents', [
                 'name' => 'Luis Hurtado',
-                'brand_id' => $brand->id,
+                'brand_ids' => [$brand->id],
             ])
             ->assertRedirect('/admin/agents');
 
         $this->assertDatabaseHas('agents', [
             'name' => 'Luis Hurtado',
             'slug' => 'luis-hurtado',
+        ]);
+        $agent = Agent::where('slug', 'luis-hurtado')->firstOrFail();
+        $this->assertDatabaseHas('agent_brand', [
+            'agent_id' => $agent->id,
             'brand_id' => $brand->id,
         ]);
+    }
+
+    public function test_admin_can_create_an_agent_with_multiple_brands(): void
+    {
+        $user = User::factory()->create();
+        $brandA = Brand::factory()->create();
+        $brandB = Brand::factory()->create();
+
+        $this->actingAs($user)
+            ->post('/admin/agents', [
+                'name' => 'Multi Brand Agent',
+                'brand_ids' => [$brandA->id, $brandB->id],
+            ])
+            ->assertRedirect('/admin/agents');
+
+        $agent = Agent::where('name', 'Multi Brand Agent')->firstOrFail();
+        $this->assertCount(2, $agent->brands);
     }
 
     public function test_slug_is_unique_when_name_collides(): void
@@ -60,19 +81,35 @@ class AgentsTest extends TestCase
 
         $this->actingAs($user)->post('/admin/agents', [
             'name' => 'Luis Hurtado',
-            'brand_id' => $brand->id,
+            'brand_ids' => [$brand->id],
         ]);
 
         $this->assertDatabaseHas('agents', ['slug' => 'luis-hurtado-2']);
     }
 
-    public function test_brand_id_is_required(): void
+    public function test_brand_ids_is_required(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)
             ->post('/admin/agents', ['name' => 'No Brand'])
-            ->assertSessionHasErrors('brand_id');
+            ->assertSessionHasErrors('brand_ids');
+    }
+
+    public function test_admin_can_update_an_agents_brands(): void
+    {
+        $user = User::factory()->create();
+        $agent = Agent::factory()->create();
+        $newBrand = Brand::factory()->create();
+
+        $this->actingAs($user)
+            ->patch("/admin/agents/{$agent->id}", [
+                'name' => $agent->name,
+                'brand_ids' => [$newBrand->id],
+            ])
+            ->assertRedirect('/admin/agents');
+
+        $this->assertSame([$newBrand->id], $agent->brands()->pluck('brands.id')->all());
     }
 
     public function test_admin_can_delete_an_agent(): void

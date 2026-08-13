@@ -7,6 +7,9 @@ import {
     today,
 } from '@internationalized/date';
 import {
+    ArrowDown,
+    ArrowUp,
+    ArrowUpDown,
     CalendarIcon,
     Check,
     ChevronLeft,
@@ -48,7 +51,9 @@ import { RangeCalendar } from '@/components/ui/range-calendar';
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
@@ -64,7 +69,7 @@ import {
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 
-type TaskType = { id: number; name: string };
+type TaskType = { id: number; name: string; brand: string | null };
 
 type TimerRow = {
     id: number;
@@ -77,10 +82,13 @@ type TimerRow = {
     ended_at: string | null;
 };
 
+type Sort = 'recent' | 'hours_asc' | 'hours_desc';
+
 type Filters = {
     task_type_id: number | null;
     from: string | null;
     to: string | null;
+    sort: Sort;
 };
 
 const props = defineProps<{
@@ -125,6 +133,7 @@ const dateRange = ref<any>({
     end: parseISODate(props.filters.to),
 });
 const calendarOpen = ref(false);
+const sort = ref<Sort>(props.filters.sort ?? 'recent');
 const editing = ref<TimerRow | null>(null);
 const deleting = ref<TimerRow | null>(null);
 const editForm = ref({
@@ -138,6 +147,26 @@ const selectedTaskType = computed<TaskType | null>(
     () =>
         props.taskTypes.find((t) => t.id === selectedTaskTypeId.value) ?? null,
 );
+
+// Task type names repeat across brands, so every picker groups and labels them
+// by brand to keep the duplicates distinguishable.
+const taskTypesByBrand = computed(() => {
+    const groups = new Map<string, TaskType[]>();
+
+    props.taskTypes.forEach((taskType) => {
+        const brand = taskType.brand ?? 'No project';
+
+        groups.set(brand, [...(groups.get(brand) ?? []), taskType]);
+    });
+
+    return [...groups.entries()].map(([brand, taskTypes]) => ({
+        brand,
+        taskTypes,
+    }));
+});
+
+const taskTypeLabel = (taskType: TaskType) =>
+    `${taskType.brand ?? 'No project'} — ${taskType.name}`;
 
 const selectTaskType = (taskType: TaskType | null) => {
     selectedTaskTypeId.value = taskType?.id ?? null;
@@ -176,25 +205,29 @@ const formatRangeLabel = computed(() => {
     return `${start} → ${end}`;
 });
 
-const search = () => {
+const queryParams = computed(() => ({
+    task_type_id: selectedTaskTypeId.value ?? undefined,
+    from: dateRange.value.start ? dateRange.value.start.toString() : undefined,
+    to: dateRange.value.end ? dateRange.value.end.toString() : undefined,
+    sort: sort.value === 'recent' ? undefined : sort.value,
+}));
+
+const visit = (extra: Record<string, unknown> = {}) => {
     router.get(
         '/admin/reports',
-        {
-            task_type_id: selectedTaskTypeId.value ?? undefined,
-            from: dateRange.value.start
-                ? dateRange.value.start.toString()
-                : undefined,
-            to: dateRange.value.end
-                ? dateRange.value.end.toString()
-                : undefined,
-        },
+        { ...queryParams.value, ...extra },
         { preserveState: true, preserveScroll: true },
     );
+};
+
+const search = () => {
+    visit();
 };
 
 const reset = () => {
     selectedTaskTypeId.value = null;
     dateRange.value = { start: undefined, end: undefined };
+    sort.value = 'recent';
     router.get(
         '/admin/reports',
         {},
@@ -205,15 +238,11 @@ const reset = () => {
 const exportUrl = computed(() => {
     const params = new URLSearchParams();
 
-    if (selectedTaskTypeId.value !== null) {
-        params.set('task_type_id', String(selectedTaskTypeId.value));
-    }
-    if (dateRange.value.start) {
-        params.set('from', dateRange.value.start.toString());
-    }
-    if (dateRange.value.end) {
-        params.set('to', dateRange.value.end.toString());
-    }
+    Object.entries(queryParams.value).forEach(([key, value]) => {
+        if (value !== undefined) {
+            params.set(key, String(value));
+        }
+    });
 
     const query = params.toString();
 
@@ -221,21 +250,44 @@ const exportUrl = computed(() => {
 });
 
 const changePage = (page: number) => {
-    router.get(
-        '/admin/reports',
-        {
-            task_type_id: selectedTaskTypeId.value ?? undefined,
-            from: dateRange.value.start
-                ? dateRange.value.start.toString()
-                : undefined,
-            to: dateRange.value.end
-                ? dateRange.value.end.toString()
-                : undefined,
-            page,
-        },
-        { preserveState: true, preserveScroll: true },
-    );
+    visit({ page });
 };
+
+// Cycles longest → shortest → back to most recent, so the header click both
+// sorts and clears without a separate control.
+const toggleHoursSort = () => {
+    sort.value =
+        sort.value === 'hours_desc'
+            ? 'hours_asc'
+            : sort.value === 'hours_asc'
+              ? 'recent'
+              : 'hours_desc';
+    visit();
+};
+
+const hoursSortIcon = computed(() => {
+    if (sort.value === 'hours_desc') {
+        return ArrowDown;
+    }
+
+    if (sort.value === 'hours_asc') {
+        return ArrowUp;
+    }
+
+    return ArrowUpDown;
+});
+
+const hoursSortLabel = computed(() => {
+    if (sort.value === 'hours_desc') {
+        return 'Sorted by longest first. Click to sort shortest first.';
+    }
+
+    if (sort.value === 'hours_asc') {
+        return 'Sorted by shortest first. Click to clear sorting.';
+    }
+
+    return 'Click to sort by longest first.';
+});
 
 const openEdit = (timer: TimerRow) => {
     editing.value = timer;
@@ -314,7 +366,7 @@ const initialRange = today(getLocalTimeZone());
                                 <span class="truncate">
                                     {{
                                         selectedTaskType
-                                            ? selectedTaskType.name
+                                            ? taskTypeLabel(selectedTaskType)
                                             : 'All task types'
                                     }}
                                 </span>
@@ -352,10 +404,16 @@ const initialRange = today(getLocalTimeZone());
                                             />
                                             All task types
                                         </CommandItem>
+                                    </CommandGroup>
+                                    <CommandGroup
+                                        v-for="group in taskTypesByBrand"
+                                        :key="group.brand"
+                                        :heading="group.brand"
+                                    >
                                         <CommandItem
-                                            v-for="taskType in taskTypes"
+                                            v-for="taskType in group.taskTypes"
                                             :key="taskType.id"
-                                            :value="taskType.name"
+                                            :value="`${group.brand} ${taskType.name}`"
                                             @select="selectTaskType(taskType)"
                                         >
                                             <Check
@@ -449,7 +507,25 @@ const initialRange = today(getLocalTimeZone());
                         <TableHead class="px-5">Agent</TableHead>
                         <TableHead class="px-5">Brand</TableHead>
                         <TableHead class="px-5">Task type</TableHead>
-                        <TableHead class="px-5 text-right">Hours</TableHead>
+                        <TableHead class="px-5 text-right">
+                            <button
+                                type="button"
+                                class="ml-auto flex items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors hover:text-foreground"
+                                :class="
+                                    sort === 'recent'
+                                        ? 'text-muted-foreground'
+                                        : 'text-foreground'
+                                "
+                                :title="hoursSortLabel"
+                                @click="toggleHoursSort"
+                            >
+                                Hours
+                                <component
+                                    :is="hoursSortIcon"
+                                    class="h-3.5 w-3.5"
+                                />
+                            </button>
+                        </TableHead>
                         <TableHead class="px-5">Started at</TableHead>
                         <TableHead class="px-5">Ended at</TableHead>
                         <TableHead class="w-48 px-5 text-right"
@@ -553,13 +629,19 @@ const initialRange = today(getLocalTimeZone());
                                 <SelectValue placeholder="Select task type" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem
-                                    v-for="taskType in taskTypes"
-                                    :key="taskType.id"
-                                    :value="String(taskType.id)"
+                                <SelectGroup
+                                    v-for="group in taskTypesByBrand"
+                                    :key="group.brand"
                                 >
-                                    {{ taskType.name }}
-                                </SelectItem>
+                                    <SelectLabel>{{ group.brand }}</SelectLabel>
+                                    <SelectItem
+                                        v-for="taskType in group.taskTypes"
+                                        :key="taskType.id"
+                                        :value="String(taskType.id)"
+                                    >
+                                        {{ taskType.name }}
+                                    </SelectItem>
+                                </SelectGroup>
                             </SelectContent>
                         </Select>
                     </div>

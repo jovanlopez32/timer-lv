@@ -67,6 +67,9 @@ const deletingId = ref<number | null>(null);
 const deletingTaskType = computed(() =>
     props.taskTypes.find((t) => t.id === deletingId.value) ?? null,
 );
+const deletePassword = ref('');
+const deleteError = ref('');
+const deleting = ref(false);
 
 const nameInputs = ref<Record<string, HTMLInputElement | null>>({});
 const setNameInputRef = (key: string) => (el: unknown) => {
@@ -82,6 +85,14 @@ const startEditing = (taskType: TaskType) => {
     focusInput(`edit-${taskType.id}`);
 };
 
+const startDeleting = (taskType: TaskType) => {
+    editingId.value = null;
+    deletePassword.value = '';
+    deleteError.value = '';
+    deletingId.value = taskType.id;
+    focusInput(`delete-${taskType.id}`);
+};
+
 const createOpen = ref(false);
 const createBrandId = ref<string | undefined>(
     props.brands.length > 0 ? String(props.brands[0].id) : undefined,
@@ -94,9 +105,25 @@ const openCreate = () => {
 };
 
 const confirmDestroy = (taskType: TaskType) => {
-    deletingId.value = null;
+    if (!deletePassword.value || deleting.value) {
+        return;
+    }
+
+    deleting.value = true;
+    deleteError.value = '';
+
     router.delete(`/admin/task-types/${taskType.id}`, {
+        data: { password: deletePassword.value },
         preserveScroll: true,
+        onSuccess: () => {
+            deletingId.value = null;
+        },
+        onError: (errors) => {
+            deleteError.value = errors.password ?? 'Something went wrong.';
+        },
+        onFinish: () => {
+            deleting.value = false;
+        },
     });
 };
 </script>
@@ -230,9 +257,9 @@ const confirmDestroy = (taskType: TaskType) => {
                                     :open="deletingId === taskType.id"
                                     @update:open="
                                         (open: boolean) =>
-                                            (deletingId = open
-                                                ? taskType.id
-                                                : null)
+                                            open
+                                                ? startDeleting(taskType)
+                                                : (deletingId = null)
                                     "
                                 >
                                     <PopoverTrigger as-child>
@@ -258,8 +285,38 @@ const confirmDestroy = (taskType: TaskType) => {
                                                 >"{{
                                                     deletingTaskType?.name
                                                 }}"</span
-                                            >? This can't be undone.
+                                            >? This permanently deletes every
+                                            timer logged under it. This
+                                            can't be undone.
                                         </p>
+                                        <div class="grid gap-1.5">
+                                            <Label
+                                                :for="`delete-${taskType.id}`"
+                                                class="text-xs"
+                                            >
+                                                Confirm with your password
+                                            </Label>
+                                            <Input
+                                                :id="`delete-${taskType.id}`"
+                                                :ref="
+                                                    setNameInputRef(
+                                                        `delete-${taskType.id}`,
+                                                    )
+                                                "
+                                                v-model="deletePassword"
+                                                type="password"
+                                                autocomplete="current-password"
+                                                @keydown.enter="
+                                                    confirmDestroy(taskType)
+                                                "
+                                            />
+                                            <p
+                                                v-if="deleteError"
+                                                class="text-xs text-destructive"
+                                            >
+                                                {{ deleteError }}
+                                            </p>
+                                        </div>
                                         <div class="flex justify-end gap-2">
                                             <Button
                                                 type="button"
@@ -273,10 +330,15 @@ const confirmDestroy = (taskType: TaskType) => {
                                                 type="button"
                                                 variant="destructive"
                                                 size="sm"
+                                                :disabled="
+                                                    !deletePassword ||
+                                                    deleting
+                                                "
                                                 @click="
                                                     confirmDestroy(taskType)
                                                 "
                                             >
+                                                <Spinner v-if="deleting" />
                                                 Delete
                                             </Button>
                                         </div>

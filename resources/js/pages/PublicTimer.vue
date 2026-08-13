@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
+import LightRays from '@/components/backgrounds/LightRays.vue';
 import {
     Check,
     ChevronsUpDown,
@@ -46,15 +47,18 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { usePictureInPictureWindow } from '@/composables/usePictureInPictureWindow';
+import { useAppearance } from '@/composables/useAppearance';
 import { cn } from '@/lib/utils';
 
-type TaskType = { id: number; name: string };
+type Brand = { id: number; name: string; color: string };
+
+type TaskType = { id: number; name: string; brand_id: number; brand: Brand };
 
 type Agent = {
     id: number;
     name: string;
     slug: string;
-    brand: string;
+    brands: Brand[];
 };
 
 type ActiveTimer = {
@@ -91,6 +95,28 @@ const page = usePage<{
 const selectedTaskTypeId = ref<number | null>(
     props.activeTimer?.task_type_id ?? null,
 );
+
+// Agents tagged with more than one brand must pick which project they're
+// working on before task types (scoped per brand) become selectable.
+const showBrandPicker = computed(() => props.agent.brands.length > 1);
+const selectedBrandId = ref<number | null>(
+    props.activeTimer?.task_type.brand_id ?? props.agent.brands[0]?.id ?? null,
+);
+
+const taskTypesForBrand = computed(() =>
+    selectedBrandId.value === null
+        ? []
+        : props.taskTypes.filter((t) => t.brand_id === selectedBrandId.value),
+);
+
+const selectBrand = (brandId: number) => {
+    if (hasActiveTimer.value) {
+        return;
+    }
+    selectedBrandId.value = brandId;
+    selectedTaskTypeId.value = null;
+};
+
 const comboboxOpen = ref(false);
 const hasShownTimer = ref(!!props.activeTimer);
 const completedHours = ref<number | null>(null);
@@ -103,6 +129,8 @@ watch(
     () => props.activeTimer,
     (timer) => {
         selectedTaskTypeId.value = timer?.task_type_id ?? null;
+        selectedBrandId.value =
+            timer?.task_type.brand_id ?? props.agent.brands[0]?.id ?? null;
         if (timer) {
             hasShownTimer.value = true;
         }
@@ -406,13 +434,56 @@ const timerSectionClass = computed(() =>
         ? 'flex min-h-screen flex-col justify-center gap-6 bg-background p-6'
         : 'space-y-6 rounded-2xl border bg-card p-8 text-card-foreground shadow-sm',
 );
+
+// The WebGL rays are additive against near-black, but blended over a white
+// background their colour never rises above a pale grey (verified by
+// sampling rendered pixels: peak point read rgb(197,203,210), i.e. no real
+// blue). Dark mode keeps the original shader untouched; light mode swaps it
+// for a plain CSS glow, which reads as actual blue with no risk of the
+// shader's noise uniform showing up as dark speckles.
+const { resolvedAppearance } = useAppearance();
+const isDark = computed(() => resolvedAppearance.value === 'dark');
 </script>
+
+<style scoped>
+.custom-rays {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+}
+</style>
 
 <template>
     <Head :title="agent.name" />
 
+    <LightRays
+      v-if="isDark"
+      rays-origin="left"
+      rays-color="#1b97bb"
+      :rays-speed="1"
+      :light-spread="0.5"
+      :ray-length="3"
+      :follow-mouse="true"
+      :mouse-influence="0.4"
+      :noise-amount="0.4"
+      :distortion="0.05"
+      class-name="custom-rays"
+    />
     <div
-        class="flex min-h-screen flex-col items-center justify-center bg-background px-6 py-12 text-foreground"
+      v-else
+      aria-hidden="true"
+      class="custom-rays pointer-events-none fixed inset-0 z-[3] overflow-hidden"
+    >
+        <div
+            class="absolute -left-40 top-1/3 h-[40rem] w-[40rem] -translate-y-1/2 rounded-full bg-sky-400/40 blur-3xl"
+        />
+        <div
+            class="absolute -left-20 top-1/4 h-72 w-72 rounded-full bg-sky-300/50 blur-3xl"
+        />
+    </div>
+
+    <div
+        class="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 py-12 text-foreground"
     >
         <div
             class="grid w-full max-w-5xl gap-8 lg:grid-cols-[minmax(0,1fr)_280px]"
@@ -423,9 +494,36 @@ const timerSectionClass = computed(() =>
                         {{ agent.name }}
                     </h1>
                     <p class="text-sm text-muted-foreground">
-                        {{ agent.brand }}
+                        {{ agent.brands.map((b) => b.name).join(', ') }}
                     </p>
                 </header>
+
+                <section v-if="showBrandPicker" class="space-y-2">
+                    <p class="mb-1.5 text-sm font-medium text-foreground">
+                        Brand / project
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="brand in agent.brands"
+                            :key="brand.id"
+                            type="button"
+                            :disabled="hasActiveTimer"
+                            @click="selectBrand(brand.id)"
+                            :class="[
+                                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-50',
+                                selectedBrandId === brand.id
+                                    ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                                    : 'opacity-60 hover:opacity-100',
+                            ]"
+                        >
+                            <span
+                                class="h-2 w-2 shrink-0 rounded-full"
+                                :style="{ backgroundColor: brand.color }"
+                            />
+                            {{ brand.name }}
+                        </button>
+                    </div>
+                </section>
 
                 <section class="space-y-2">
                     <p class="mb-1.5 text-sm font-medium text-foreground">
@@ -437,7 +535,7 @@ const timerSectionClass = computed(() =>
                                 variant="outline"
                                 role="combobox"
                                 :aria-expanded="comboboxOpen"
-                                :disabled="hasActiveTimer"
+                                :disabled="hasActiveTimer || !selectedBrandId"
                                 class="w-full justify-between"
                             >
                                 <span class="truncate">
@@ -465,7 +563,7 @@ const timerSectionClass = computed(() =>
                                     </CommandEmpty>
                                     <CommandGroup>
                                         <CommandItem
-                                            v-for="taskType in taskTypes"
+                                            v-for="taskType in taskTypesForBrand"
                                             :key="taskType.id"
                                             :value="taskType.name"
                                             @select="selectTaskType(taskType)"
@@ -646,6 +744,18 @@ const timerSectionClass = computed(() =>
                         :key="timer.id"
                         class="space-y-2 rounded-2xl border bg-card p-4 text-card-foreground shadow-sm"
                     >
+                        <div
+                            v-if="showBrandPicker"
+                            class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+                        >
+                            <span
+                                class="h-2 w-2 shrink-0 rounded-full"
+                                :style="{
+                                    backgroundColor: timer.task_type.brand.color,
+                                }"
+                            />
+                            {{ timer.task_type.brand.name }}
+                        </div>
                         <p
                             class="truncate text-sm font-medium"
                             :title="timer.task_type.name"

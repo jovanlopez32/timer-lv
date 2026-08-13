@@ -21,6 +21,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('admin')->group(function () {
         Route::get('active-work', [ActiveWorkController::class, 'index'])->name('active-work.index');
+        Route::patch('active-work/{timer:id}', [ActiveWorkController::class, 'update'])->name('active-work.update');
         Route::get('reports', [ReportsController::class, 'index'])->name('reports.index');
         Route::get('reports/export', [ReportsController::class, 'export'])->name('reports.export');
         Route::patch('reports/{timer:id}', [ReportsController::class, 'update'])->name('reports.update');

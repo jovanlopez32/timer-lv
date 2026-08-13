@@ -19,15 +19,16 @@ class ReportsController extends Controller
             'task_type_id' => ['nullable', 'integer', 'exists:task_types,id'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'sort' => ['nullable', 'string', 'in:recent,hours_asc,hours_desc'],
             'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $timersQuery = Timer::query()
             ->where('completed', true)
-            ->with(['agent:id,name,slug,brand_id', 'agent.brand:id,name', 'taskType:id,name'])
-            ->latest('ended_at');
+            ->with(['agent:id,name,slug', 'taskType:id,name,brand_id', 'taskType.brand:id,name']);
 
         $timersQuery = $this->applyFilters($timersQuery, $data);
+        $timersQuery = $this->applySort($timersQuery, $data['sort'] ?? null);
         $totalHours = (clone $timersQuery)->sum('decimal_hours');
         $timers = $timersQuery
             ->paginate(50)
@@ -35,18 +36,30 @@ class ReportsController extends Controller
 
         return Inertia::render('admin/Reports', [
             'taskTypes' => TaskType::query()
+                ->with('brand:id,name')
                 ->orderBy('name')
-                ->get(['id', 'name']),
+                ->get(['id', 'name', 'brand_id'])
+                ->map(fn (TaskType $taskType) => [
+                    'id' => $taskType->id,
+                    'name' => $taskType->name,
+                    'brand' => $taskType->brand?->name,
+                ])
+                ->sortBy([
+                    fn (array $a, array $b) => ($a['brand'] ?? '') <=> ($b['brand'] ?? ''),
+                    fn (array $a, array $b) => $a['name'] <=> $b['name'],
+                ])
+                ->values(),
             'filters' => [
                 'task_type_id' => $data['task_type_id'] ?? null,
                 'from' => $data['from'] ?? null,
                 'to' => $data['to'] ?? null,
+                'sort' => $data['sort'] ?? 'recent',
             ],
             'timers' => [
                 'data' => $timers->getCollection()->map(fn (Timer $timer) => [
                     'id' => $timer->id,
                     'agent' => $timer->agent->name,
-                    'brand' => $timer->agent->brand?->name,
+                    'brand' => $timer->taskType->brand?->name,
                     'task_type_id' => $timer->task_type_id,
                     'task_type' => $timer->taskType->name,
                     'decimal_hours' => (float) $timer->decimal_hours,
@@ -100,14 +113,15 @@ class ReportsController extends Controller
             'task_type_id' => ['nullable', 'integer', 'exists:task_types,id'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date', 'after_or_equal:from'],
+            'sort' => ['nullable', 'string', 'in:recent,hours_asc,hours_desc'],
         ]);
 
         $query = Timer::query()
             ->where('completed', true)
-            ->with(['agent:id,name,brand_id', 'agent.brand:id,name', 'taskType:id,name'])
-            ->latest('ended_at');
+            ->with(['agent:id,name', 'taskType:id,name,brand_id', 'taskType.brand:id,name']);
 
         $query = $this->applyFilters($query, $data);
+        $query = $this->applySort($query, $data['sort'] ?? null);
 
         return response()->streamDownload(function () use ($query): void {
             $output = fopen('php://output', 'w');
@@ -116,7 +130,7 @@ class ReportsController extends Controller
             foreach ($query->lazy(500) as $timer) {
                 fputcsv($output, [
                     $timer->agent->name,
-                    $timer->agent->brand?->name,
+                    $timer->taskType->brand?->name,
                     $timer->taskType->name,
                     number_format((float) $timer->decimal_hours, 2, '.', ''),
                     $timer->started_at?->toDateTimeString(),
@@ -145,5 +159,14 @@ class ReportsController extends Controller
         }
 
         return $query;
+    }
+
+    private function applySort($query, ?string $sort)
+    {
+        return match ($sort) {
+            'hours_asc' => $query->orderBy('decimal_hours')->orderByDesc('ended_at'),
+            'hours_desc' => $query->orderByDesc('decimal_hours')->orderByDesc('ended_at'),
+            default => $query->latest('ended_at'),
+        };
     }
 }

@@ -24,7 +24,7 @@ class StatsTest extends TestCase
         $user = User::factory()->create();
 
         $brand = Brand::factory()->create(['name' => 'Leadventure']);
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create([
             'brand_id' => $brand->id,
             'name' => 'Development',
@@ -76,8 +76,8 @@ class StatsTest extends TestCase
     {
         $user = User::factory()->create();
         $brand = Brand::factory()->create();
-        $agentA = Agent::factory()->create(['brand_id' => $brand->id]);
-        $agentB = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agentA = Agent::factory()->forBrand($brand->id)->create();
+        $agentB = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         Timer::factory()->for($agentA)->for($taskType, 'taskType')->completed(2.0)->create();
@@ -97,7 +97,7 @@ class StatsTest extends TestCase
     {
         $user = User::factory()->create();
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         Timer::factory()
@@ -128,7 +128,7 @@ class StatsTest extends TestCase
     {
         $user = User::factory()->create();
         $brand = Brand::factory()->create(['name' => 'Leadventure']);
-        $agent = Agent::factory()->create(['brand_id' => $brand->id, 'name' => 'Agent Smith']);
+        $agent = Agent::factory()->forBrand($brand->id)->create(['name' => 'Agent Smith']);
 
         $this->actingAs($user)
             ->get('/admin/stats')

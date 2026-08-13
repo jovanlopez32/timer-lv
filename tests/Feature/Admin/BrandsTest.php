@@ -41,7 +41,31 @@ class BrandsTest extends TestCase
         $this->assertDatabaseHas('brands', [
             'name' => 'Leadventure',
             'slug' => 'leadventure',
+            'color' => '#6366f1',
         ]);
+    }
+
+    public function test_admin_can_create_a_brand_with_a_custom_color(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post('/admin/brands', ['name' => 'Leadventure', 'color' => '#FF00AA'])
+            ->assertRedirect('/admin/brands');
+
+        $this->assertDatabaseHas('brands', [
+            'name' => 'Leadventure',
+            'color' => '#FF00AA',
+        ]);
+    }
+
+    public function test_brand_color_must_be_a_valid_hex_value(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->post('/admin/brands', ['name' => 'Leadventure', 'color' => 'not-a-color'])
+            ->assertSessionHasErrors('color');
     }
 
     public function test_brand_name_must_be_unique(): void

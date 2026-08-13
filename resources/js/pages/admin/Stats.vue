@@ -35,6 +35,7 @@ type TaskTypeStats = {
 type BrandStats = {
     id: number;
     name: string;
+    color: string;
     task_types: TaskTypeStats[];
 };
 
@@ -67,6 +68,12 @@ defineOptions({
 
 const format = (value: number | null) =>
     value === null ? '—' : value.toFixed(2);
+
+// Cards lean on the brand's own color as a soft tint instead of a border to
+// keep sections visually distinct without adding extra chrome.
+const brandCardStyle = (color: string) => ({
+    backgroundColor: `${color}1A`,
+});
 
 const parseISODate = (value: string | null): CalendarDate | undefined => {
     if (!value) {
@@ -290,9 +297,15 @@ const reset = () => {
             No brands yet. Create a brand to see stats.
         </div>
 
-        <section v-for="brand in brands" :key="brand.id" class="space-y-4">
-            <div class="flex items-baseline justify-between">
-                <h2 class="text-lg font-semibold">{{ brand.name }}</h2>
+        <section v-for="brand in brands" :key="brand.id" class="space-y-3">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <span
+                        class="h-2.5 w-2.5 shrink-0 rounded-full"
+                        :style="{ backgroundColor: brand.color }"
+                    />
+                    <h2 class="text-lg font-semibold">{{ brand.name }}</h2>
+                </div>
                 <span
                     class="text-xs tracking-wider text-muted-foreground uppercase"
                 >
@@ -312,62 +325,66 @@ const reset = () => {
                 This brand has no task types.
             </div>
 
-            <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div
+                v-else
+                class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            >
                 <div
                     v-for="taskType in brand.task_types"
                     :key="taskType.id"
-                    class="rounded-xl border bg-card p-5 text-card-foreground shadow-sm"
+                    class="rounded-xl p-4 text-card-foreground"
+                    :style="brandCardStyle(brand.color)"
                 >
                     <div class="flex items-baseline justify-between gap-2">
-                        <h3 class="truncate font-medium">
+                        <h3 class="truncate text-sm font-medium">
                             {{ taskType.name }}
                         </h3>
                         <span
-                            class="shrink-0 text-xs tracking-wider text-muted-foreground uppercase"
+                            class="shrink-0 text-[11px] tracking-wider text-muted-foreground uppercase"
                         >
                             {{ taskType.count }}
                             {{ taskType.count === 1 ? 'timer' : 'timers' }}
                         </span>
                     </div>
 
-                    <dl class="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <dl class="mt-3 grid grid-cols-2 gap-2.5 text-sm">
                         <div>
                             <dt
-                                class="text-xs tracking-wider text-muted-foreground uppercase"
+                                class="text-[11px] tracking-wider text-muted-foreground uppercase"
                             >
                                 Average
                             </dt>
-                            <dd class="mt-1 font-mono text-xl tabular-nums">
+                            <dd class="mt-0.5 font-mono text-lg tabular-nums">
                                 {{ format(taskType.average) }}
                             </dd>
                         </div>
                         <div>
                             <dt
-                                class="text-xs tracking-wider text-muted-foreground uppercase"
+                                class="text-[11px] tracking-wider text-muted-foreground uppercase"
                             >
                                 Median
                             </dt>
-                            <dd class="mt-1 font-mono text-xl tabular-nums">
+                            <dd class="mt-0.5 font-mono text-lg tabular-nums">
                                 {{ format(taskType.median) }}
                             </dd>
                         </div>
                         <div>
                             <dt
-                                class="text-xs tracking-wider text-muted-foreground uppercase"
+                                class="text-[11px] tracking-wider text-muted-foreground uppercase"
                             >
                                 Min
                             </dt>
-                            <dd class="mt-1 font-mono text-xl tabular-nums">
+                            <dd class="mt-0.5 font-mono text-lg tabular-nums">
                                 {{ format(taskType.min) }}
                             </dd>
                         </div>
                         <div>
                             <dt
-                                class="text-xs tracking-wider text-muted-foreground uppercase"
+                                class="text-[11px] tracking-wider text-muted-foreground uppercase"
                             >
                                 Max
                             </dt>
-                            <dd class="mt-1 font-mono text-xl tabular-nums">
+                            <dd class="mt-0.5 font-mono text-lg tabular-nums">
                                 {{ format(taskType.max) }}
                             </dd>
                         </div>

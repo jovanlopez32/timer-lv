@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Agent;
+use App\Models\Brand;
 use App\Models\TaskType;
 use App\Models\Timer;
 use Illuminate\Http\RedirectResponse;
@@ -16,26 +17,24 @@ class PublicTimerController extends Controller
 {
     public function show(Agent $agent): Response
     {
-        $agent->load('brand:id,name');
+        $agent->load(['brands' => fn ($q) => $q->orderBy('name')]);
+        $brandIds = $agent->brands->pluck('id');
 
         $activeTimer = Timer::query()
             ->where('agent_id', $agent->id)
             ->active()
-            ->with(['taskType', 'sessions'])
+            ->with(['taskType.brand:id,name,color', 'sessions'])
             ->first();
 
         $parkedTimers = Timer::query()
             ->where('agent_id', $agent->id)
             ->parked()
-            ->with(['taskType', 'sessions'])
+            ->with(['taskType.brand:id,name,color', 'sessions'])
             ->orderBy('parked_at')
             ->get()
             ->map(fn (Timer $timer) => [
                 'id' => $timer->id,
-                'task_type' => [
-                    'id' => $timer->taskType->id,
-                    'name' => $timer->taskType->name,
-                ],
+                'task_type' => $this->taskTypePayload($timer->taskType),
                 'parked_at' => $timer->parked_at?->toIso8601String(),
                 'elapsed_seconds' => $timer->elapsedSeconds(),
             ])
@@ -47,10 +46,7 @@ class PublicTimerController extends Controller
             $payload = [
                 'id' => $activeTimer->id,
                 'task_type_id' => $activeTimer->task_type_id,
-                'task_type' => [
-                    'id' => $activeTimer->taskType->id,
-                    'name' => $activeTimer->taskType->name,
-                ],
+                'task_type' => $this->taskTypePayload($activeTimer->taskType),
                 'started_at' => $activeTimer->started_at->toIso8601String(),
                 'elapsed_seconds' => $activeTimer->elapsedSeconds(),
                 'is_running' => $activeTimer->currentSession() !== null,
@@ -62,12 +58,18 @@ class PublicTimerController extends Controller
                 'id' => $agent->id,
                 'name' => $agent->name,
                 'slug' => $agent->slug,
-                'brand' => $agent->brand?->name,
+                'brands' => $agent->brands->map(fn (Brand $brand) => [
+                    'id' => $brand->id,
+                    'name' => $brand->name,
+                    'color' => $brand->color,
+                ]),
             ],
             'taskTypes' => TaskType::query()
-                ->where('brand_id', $agent->brand_id)
+                ->whereIn('brand_id', $brandIds)
+                ->with('brand:id,name,color')
                 ->orderBy('name')
-                ->get(['id', 'name']),
+                ->get(['id', 'name', 'brand_id'])
+                ->map(fn (TaskType $taskType) => $this->taskTypePayload($taskType)),
             'activeTimer' => $payload,
             'parkedTimers' => $parkedTimers,
         ]);
@@ -75,12 +77,14 @@ class PublicTimerController extends Controller
 
     public function start(Request $request, Agent $agent): RedirectResponse
     {
+        $brandIds = $agent->brands()->pluck('brands.id');
+
         $data = $request->validate([
             'task_type_id' => [
                 'required',
                 'integer',
                 Rule::exists('task_types', 'id')
-                    ->where(fn ($q) => $q->where('brand_id', $agent->brand_id)),
+                    ->where(fn ($q) => $q->whereIn('brand_id', $brandIds)),
             ],
         ]);
 
@@ -195,5 +199,22 @@ class PublicTimerController extends Controller
             ->with('completedHours', $hours)
             ->with('completedSeconds', $seconds)
             ->with('completedTimerId', $timer->id);
+    }
+
+    /**
+     * @return array{id: int, name: string, brand_id: int, brand: array{id: int, name: string, color: string}}
+     */
+    private function taskTypePayload(TaskType $taskType): array
+    {
+        return [
+            'id' => $taskType->id,
+            'name' => $taskType->name,
+            'brand_id' => $taskType->brand_id,
+            'brand' => [
+                'id' => $taskType->brand->id,
+                'name' => $taskType->brand->name,
+                'color' => $taskType->brand->color,
+            ],
+        ];
     }
 }

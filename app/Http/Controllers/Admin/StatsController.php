@@ -43,10 +43,11 @@ class StatsController extends Controller
         $brands = Brand::query()
             ->with(['taskTypes' => fn ($q) => $q->orderBy('name')])
             ->orderBy('name')
-            ->get(['id', 'name'])
+            ->get(['id', 'name', 'color'])
             ->map(fn (Brand $brand) => [
                 'id' => $brand->id,
                 'name' => $brand->name,
+                'color' => $brand->color,
                 'task_types' => $brand->taskTypes->map(function ($taskType) use ($hoursByTaskType) {
                     $hours = $hoursByTaskType->get($taskType->id, []);
 
@@ -65,13 +66,13 @@ class StatsController extends Controller
         return Inertia::render('admin/Stats', [
             'brands' => $brands,
             'agents' => Agent::query()
-                ->with('brand:id,name')
+                ->with(['brands' => fn ($q) => $q->orderBy('name')])
                 ->orderBy('name')
-                ->get(['id', 'name', 'brand_id'])
+                ->get(['id', 'name'])
                 ->map(fn (Agent $agent) => [
                     'id' => $agent->id,
                     'name' => $agent->name,
-                    'brand' => $agent->brand?->name,
+                    'brand' => $agent->brands->pluck('name')->implode(', ') ?: null,
                 ]),
             'filters' => [
                 'from' => $data['from'] ?? null,

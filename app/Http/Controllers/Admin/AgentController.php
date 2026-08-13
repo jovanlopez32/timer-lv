@@ -17,28 +17,24 @@ class AgentController extends Controller
     {
         return Inertia::render('admin/Agents', [
             'agents' => Agent::query()
-                ->join('brands', 'brands.id', '=', 'agents.brand_id')
-                ->with('brand:id,name')
-                ->orderBy('brands.name')
-                ->orderBy('agents.name')
-                ->get([
-                    'agents.id',
-                    'agents.name',
-                    'agents.slug',
-                    'agents.brand_id',
-                    'agents.created_at',
-                ])
+                ->with(['brands' => fn ($q) => $q->orderBy('name')])
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug', 'created_at'])
                 ->map(fn (Agent $agent) => [
                     'id' => $agent->id,
                     'name' => $agent->name,
                     'slug' => $agent->slug,
-                    'brand_id' => $agent->brand_id,
-                    'brand' => $agent->brand?->name,
+                    'brand_ids' => $agent->brands->pluck('id'),
+                    'brands' => $agent->brands->map(fn (Brand $brand) => [
+                        'id' => $brand->id,
+                        'name' => $brand->name,
+                        'color' => $brand->color,
+                    ]),
                     'created_at' => $agent->created_at?->toIso8601String(),
                 ]),
             'brands' => Brand::query()
                 ->orderBy('name')
-                ->get(['id', 'name']),
+                ->get(['id', 'name', 'color']),
         ]);
     }
 
@@ -46,14 +42,16 @@ class AgentController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'brand_id' => ['required', 'integer', 'exists:brands,id'],
+            'brand_ids' => ['required', 'array', 'min:1'],
+            'brand_ids.*' => ['integer', 'exists:brands,id'],
         ]);
 
-        Agent::create([
+        $agent = Agent::create([
             'name' => $data['name'],
-            'brand_id' => $data['brand_id'],
             'slug' => $this->uniqueSlug($data['name']),
         ]);
+
+        $agent->brands()->sync($data['brand_ids']);
 
         return redirect()->route('agents.index');
     }
@@ -62,7 +60,8 @@ class AgentController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'brand_id' => ['required', 'integer', 'exists:brands,id'],
+            'brand_ids' => ['required', 'array', 'min:1'],
+            'brand_ids.*' => ['integer', 'exists:brands,id'],
         ]);
 
         $slug = $agent->slug;
@@ -72,9 +71,10 @@ class AgentController extends Controller
 
         $agent->update([
             'name' => $data['name'],
-            'brand_id' => $data['brand_id'],
             'slug' => $slug,
         ]);
+
+        $agent->brands()->sync($data['brand_ids']);
 
         return redirect()->route('agents.index');
     }

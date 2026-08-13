@@ -6,10 +6,10 @@ use Database\Factories\AgentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['name', 'slug', 'brand_id'])]
+#[Fillable(['name', 'slug'])]
 class Agent extends Model
 {
     /** @use HasFactory<AgentFactory> */
@@ -20,9 +20,9 @@ class Agent extends Model
         return 'slug';
     }
 
-    public function brand(): BelongsTo
+    public function brands(): BelongsToMany
     {
-        return $this->belongsTo(Brand::class);
+        return $this->belongsToMany(Brand::class)->withTimestamps();
     }
 
     public function timers(): HasMany

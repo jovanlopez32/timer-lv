@@ -22,10 +22,7 @@ class PublicTimerTest extends TestCase
     public function test_it_shows_the_agent_timer_page_with_task_types_of_its_brand(): void
     {
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create([
-            'slug' => 'luis-hurtado',
-            'brand_id' => $brand->id,
-        ]);
+        $agent = Agent::factory()->forBrand($brand->id)->create(['slug' => 'luis-hurtado']);
         TaskType::factory()->count(3)->create(['brand_id' => $brand->id]);
         TaskType::factory()->count(2)->create();
 
@@ -45,10 +42,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create([
-            'slug' => 'luis-hurtado',
-            'brand_id' => $brand->id,
-        ]);
+        $agent = Agent::factory()->forBrand($brand->id)->create(['slug' => 'luis-hurtado']);
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", [
@@ -69,7 +63,7 @@ class PublicTimerTest extends TestCase
     {
         $brand = Brand::factory()->create();
         $otherBrand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $foreignTaskType = TaskType::factory()->create(['brand_id' => $otherBrand->id]);
 
         $this->post("/{$agent->slug}/timers", [
@@ -84,7 +78,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
@@ -105,7 +99,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
@@ -127,7 +121,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
 
@@ -153,7 +147,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
 
@@ -170,10 +164,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 10:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create([
-            'slug' => 'snapshot-agent',
-            'brand_id' => $brand->id,
-        ]);
+        $agent = Agent::factory()->forBrand($brand->id)->create(['slug' => 'snapshot-agent']);
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
@@ -193,10 +184,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 10:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create([
-            'slug' => 'paused-agent',
-            'brand_id' => $brand->id,
-        ]);
+        $agent = Agent::factory()->forBrand($brand->id)->create(['slug' => 'paused-agent']);
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
@@ -218,7 +206,7 @@ class PublicTimerTest extends TestCase
     public function test_it_prevents_starting_a_second_timer_for_the_same_agent(): void
     {
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id])
@@ -235,7 +223,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
 
@@ -252,7 +240,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
 
@@ -274,10 +262,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create([
-            'slug' => 'parker',
-            'brand_id' => $brand->id,
-        ]);
+        $agent = Agent::factory()->forBrand($brand->id)->create(['slug' => 'parker']);
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);
 
@@ -303,7 +288,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
         $otherTaskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
@@ -323,7 +308,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
         $otherTaskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
@@ -345,7 +330,7 @@ class PublicTimerTest extends TestCase
         Carbon::setTestNow('2026-05-23 08:00:00');
 
         $brand = Brand::factory()->create();
-        $agent = Agent::factory()->create(['brand_id' => $brand->id]);
+        $agent = Agent::factory()->forBrand($brand->id)->create();
         $taskType = TaskType::factory()->create(['brand_id' => $brand->id]);
 
         $this->post("/{$agent->slug}/timers", ['task_type_id' => $taskType->id]);

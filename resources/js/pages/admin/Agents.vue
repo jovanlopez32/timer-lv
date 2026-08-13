@@ -14,13 +14,6 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import {
     Table,
@@ -33,18 +26,18 @@ import {
 } from '@/components/ui/table';
 import { dashboard } from '@/routes';
 
-type Brand = { id: number; name: string };
+type Brand = { id: number; name: string; color: string };
 
 type Agent = {
     id: number;
     name: string;
     slug: string;
-    brand_id: number;
-    brand: string | null;
+    brand_ids: number[];
+    brands: Brand[];
     created_at: string;
 };
 
-const props = defineProps<{ agents: Agent[]; brands: Brand[] }>();
+defineProps<{ agents: Agent[]; brands: Brand[] }>();
 
 defineOptions({
     layout: {
@@ -61,14 +54,21 @@ const editing = ref<Agent | null>(null);
 const deleting = ref<Agent | null>(null);
 
 const createOpen = ref(false);
-const newBrandId = ref<string | undefined>(
-    props.brands.length > 0 ? String(props.brands[0].id) : undefined,
-);
-const editBrandId = ref<string | undefined>(undefined);
+const newBrandIds = ref<number[]>([]);
+const editBrandIds = ref<number[]>([]);
+
+// Brands act like tags here: click to add/remove from the selection.
+const toggleBrand = (selected: number[], brandId: number) => {
+    const index = selected.indexOf(brandId);
+    if (index === -1) {
+        selected.push(brandId);
+    } else {
+        selected.splice(index, 1);
+    }
+};
 
 const openCreate = () => {
-    newBrandId.value =
-        props.brands.length > 0 ? String(props.brands[0].id) : undefined;
+    newBrandIds.value = [];
     createOpen.value = true;
 };
 
@@ -99,8 +99,8 @@ const confirmDestroy = () => {
 };
 
 const openEdit = (agent: Agent) => {
-    editing.value = { ...agent };
-    editBrandId.value = String(agent.brand_id);
+    editing.value = agent;
+    editBrandIds.value = [...agent.brand_ids];
 };
 </script>
 
@@ -112,8 +112,8 @@ const openEdit = (agent: Agent) => {
             <div>
                 <h1 class="text-2xl font-semibold">Agents</h1>
                 <p class="text-sm text-muted-foreground">
-                    Create an agent, pick a brand, and share their public
-                    timer link.
+                    Create an agent, tag it with one or more brands, and
+                    share their public timer link.
                 </p>
             </div>
             <Button v-if="brands.length > 0" @click="openCreate">
@@ -144,7 +144,7 @@ const openEdit = (agent: Agent) => {
                 <TableHeader>
                     <TableRow>
                         <TableHead class="px-5">Name</TableHead>
-                        <TableHead class="px-5">Brand</TableHead>
+                        <TableHead class="px-5">Brands</TableHead>
                         <TableHead class="px-5">Public link</TableHead>
                         <TableHead class="w-72 px-5 text-right"
                             >Actions</TableHead
@@ -159,9 +159,27 @@ const openEdit = (agent: Agent) => {
                         <TableCell class="px-5 py-4 font-medium">
                             {{ agent.name }}
                         </TableCell>
-                        <TableCell class="px-5 py-4">{{
-                            agent.brand ?? '—'
-                        }}</TableCell>
+                        <TableCell class="px-5 py-4">
+                            <div
+                                v-if="agent.brands.length > 0"
+                                class="flex flex-wrap gap-1.5"
+                            >
+                                <span
+                                    v-for="brand in agent.brands"
+                                    :key="brand.id"
+                                    class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium"
+                                >
+                                    <span
+                                        class="h-2 w-2 shrink-0 rounded-full"
+                                        :style="{
+                                            backgroundColor: brand.color,
+                                        }"
+                                    />
+                                    {{ brand.name }}
+                                </span>
+                            </div>
+                            <span v-else class="text-muted-foreground">—</span>
+                        </TableCell>
                         <TableCell class="px-5 py-4">
                             <Link
                                 :href="`/${agent.slug}`"
@@ -238,22 +256,35 @@ const openEdit = (agent: Agent) => {
                         <InputError :message="errors.name" />
                     </div>
                     <div class="grid gap-2">
-                        <Label for="create-brand_id">Brand</Label>
-                        <Select v-model="newBrandId" name="brand_id" required>
-                            <SelectTrigger id="create-brand_id">
-                                <SelectValue placeholder="Select a brand" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="brand in brands"
-                                    :key="brand.id"
-                                    :value="String(brand.id)"
-                                >
-                                    {{ brand.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <InputError :message="errors.brand_id" />
+                        <Label>Brands</Label>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                v-for="brand in brands"
+                                :key="brand.id"
+                                type="button"
+                                @click="toggleBrand(newBrandIds, brand.id)"
+                                :class="[
+                                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
+                                    newBrandIds.includes(brand.id)
+                                        ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                                        : 'opacity-60 hover:opacity-100',
+                                ]"
+                            >
+                                <span
+                                    class="h-2 w-2 shrink-0 rounded-full"
+                                    :style="{ backgroundColor: brand.color }"
+                                />
+                                {{ brand.name }}
+                            </button>
+                        </div>
+                        <input
+                            v-for="id in newBrandIds"
+                            :key="id"
+                            type="hidden"
+                            name="brand_ids[]"
+                            :value="id"
+                        />
+                        <InputError :message="errors.brand_ids" />
                     </div>
                     <DialogFooter>
                         <Button
@@ -299,22 +330,35 @@ const openEdit = (agent: Agent) => {
                         <InputError :message="errors.name" />
                     </div>
                     <div class="grid gap-2">
-                        <Label for="edit-brand_id">Brand</Label>
-                        <Select v-model="editBrandId" name="brand_id" required>
-                            <SelectTrigger id="edit-brand_id">
-                                <SelectValue placeholder="Select a brand" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem
-                                    v-for="brand in brands"
-                                    :key="brand.id"
-                                    :value="String(brand.id)"
-                                >
-                                    {{ brand.name }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                        <InputError :message="errors.brand_id" />
+                        <Label>Brands</Label>
+                        <div class="flex flex-wrap gap-2">
+                            <button
+                                v-for="brand in brands"
+                                :key="brand.id"
+                                type="button"
+                                @click="toggleBrand(editBrandIds, brand.id)"
+                                :class="[
+                                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition',
+                                    editBrandIds.includes(brand.id)
+                                        ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'
+                                        : 'opacity-60 hover:opacity-100',
+                                ]"
+                            >
+                                <span
+                                    class="h-2 w-2 shrink-0 rounded-full"
+                                    :style="{ backgroundColor: brand.color }"
+                                />
+                                {{ brand.name }}
+                            </button>
+                        </div>
+                        <input
+                            v-for="id in editBrandIds"
+                            :key="id"
+                            type="hidden"
+                            name="brand_ids[]"
+                            :value="id"
+                        />
+                        <InputError :message="errors.brand_ids" />
                     </div>
                     <DialogFooter>
                         <Button

@@ -21,6 +21,7 @@ class BrandFactory extends Factory
         return [
             'name' => $name,
             'slug' => Str::slug($name).'-'.Str::lower(Str::random(4)),
+            'color' => fake()->hexColor(),
         ];
     }
 }

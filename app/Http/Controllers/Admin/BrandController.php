@@ -18,7 +18,7 @@ class BrandController extends Controller
             'brands' => Brand::query()
                 ->withCount(['agents', 'taskTypes'])
                 ->orderBy('name')
-                ->get(['id', 'name', 'slug', 'created_at']),
+                ->get(['id', 'name', 'slug', 'color', 'created_at']),
         ]);
     }
 
@@ -26,11 +26,13 @@ class BrandController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:brands,name'],
+            'color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
         Brand::create([
             'name' => $data['name'],
             'slug' => $this->uniqueSlug($data['name']),
+            'color' => $data['color'] ?? '#6366f1',
         ]);
 
         return redirect()->route('brands.index');
@@ -40,6 +42,7 @@ class BrandController extends Controller
     {
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:brands,name,'.$brand->id],
+            'color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
         ]);
 
         $slug = $brand->slug;
@@ -50,6 +53,7 @@ class BrandController extends Controller
         $brand->update([
             'name' => $data['name'],
             'slug' => $slug,
+            'color' => $data['color'] ?? $brand->color,
         ]);
 
         return redirect()->route('brands.index');

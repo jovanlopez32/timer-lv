@@ -70,8 +70,12 @@ class TaskTypeController extends Controller
         return redirect()->route('task-types.index');
     }
 
-    public function destroy(TaskType $taskType): RedirectResponse
+    public function destroy(Request $request, TaskType $taskType): RedirectResponse
     {
+        $request->validate([
+            'password' => ['required', 'string', 'current_password'],
+        ]);
+
         $taskType->delete();
 
         return redirect()->route('task-types.index');
